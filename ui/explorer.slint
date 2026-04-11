@@ -1,0 +1,97 @@
+import { Button, ScrollView } from "std-widgets.slint";
+component Entry inherits Rectangle {
+    in property <string> name;
+
+    background: red;
+    background: ta.has-hover ? red : transparent;
+
+    height: 100px;
+    width: 100px;
+    border-radius: 15px;
+
+    ta := TouchArea { }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 10px;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                background: blue;
+
+                height: 50px;
+                width: 50px;
+            }
+        }
+
+        Text {
+            text: name;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+export component Explorer inherits Window {
+    in-out property <int> per-col: 5;
+    in property <[string]> names;
+
+    // Is set when selecting a rectangle of items
+    out property <{x: length, y: length}> select;
+    out property <bool> selecting: false;
+
+    ScrollView {
+        ta := TouchArea {
+            scroll-event(event) => {
+                if (event.modifiers.control) {
+                    if event.delta-y > 0 {
+                        per-col += 1;
+                    } else if per-col > 1 {
+                        per-col -= 1;
+                    }
+                }
+                accept
+            }
+
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    selecting = true;
+                    select = { x: ta.mouse-x, y: ta.mouse-y };
+                }
+                if event.kind == PointerEventKind.up {
+                    selecting = false;
+                }
+            }
+        }
+
+        GridLayout {
+            spacing: 10px;
+
+            for name[index] in names: Entry {
+                name: name;
+                row: index / per-col;
+                col: Math.mod(index, per-col);
+            }
+        }
+
+        // Selection rectangle
+        Rectangle {
+            visible: selecting;
+
+            border-color: green;
+            border-width: 2px;
+            border-radius: 5px;
+
+            x: Math.min(select.x, ta.mouse-x);
+            y: Math.min(select.y, ta.mouse-y);
+
+            width: Math.abs(ta.mouse-x - select.x);
+            height: Math.abs(ta.mouse-y - select.y);
+        }
+
+        // TODO: if scrolling, show the rectangle 
+
+        // TODO: scrolled() callback and use viewport-y in order to know what elements are displayed
+    }
+}

@@ -1,0 +1,4 @@
+root = true
+
+[*.slint]
+indent_size = 4
