@@ -37,12 +37,14 @@
           nativeBuildInputs = with pkgs; [
             pkg-config
             autoPatchelfHook
+            makeWrapper
           ];
           buildInputs = with pkgs; [
             libGL
             libxkbcommon
             wayland
             fontconfig
+            stdenv.cc.cc.lib
           ];
         };
 
@@ -51,6 +53,11 @@
           commonArgs
           // {
             inherit cargoArtifacts;
+
+            postFixup = ''
+              wrapProgram $out/bin/fex \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath commonArgs.buildInputs}
+            '';
           }
         );
       in
