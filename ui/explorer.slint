@@ -2,20 +2,17 @@ import { Button, ScrollView } from "std-widgets.slint";
 component Entry inherits Rectangle {
     in property <string> name;
 
-    background: red;
     background: ta.has-hover ? red : transparent;
 
     height: 100px;
-    width: 100px;
     border-radius: 15px;
 
     ta := TouchArea { }
 
-    VerticalLayout {
-        alignment: center;
+    // For now, display as lines, easier to attempt the lazy scroll this way
+    HorizontalLayout {
         spacing: 10px;
-
-        HorizontalLayout {
+        VerticalLayout {
             alignment: center;
 
             Rectangle {
@@ -28,32 +25,29 @@ component Entry inherits Rectangle {
 
         Text {
             text: name;
-            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 }
 
 export component Explorer inherits Window {
     in-out property <int> per-col: 5;
-    in property <[string]> names;
+    in property <[string]> names; // Only the displayed names
 
     // Is set when selecting a rectangle of items
     out property <{x: length, y: length}> select;
     out property <bool> selecting: false;
 
-    ScrollView {
-        ta := TouchArea {
-            scroll-event(event) => {
-                if (event.modifiers.control) {
-                    if event.delta-y > 0 {
-                        per-col += 1;
-                    } else if per-col > 1 {
-                        per-col -= 1;
-                    }
-                }
-                accept
-            }
+    out property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
+    out property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
+    in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
 
+    changed offset => refresh-slice(offset, limit);
+    changed limit => refresh-slice(offset, limit);
+    callback refresh-slice(offset: int, limit: int);
+
+    scroll := ScrollView {
+        ta := TouchArea {
             pointer-event(event) => {
                 if event.kind == PointerEventKind.down {
                     selecting = true;
@@ -65,13 +59,21 @@ export component Explorer inherits Window {
             }
         }
 
-        GridLayout {
+        VerticalLayout {
             spacing: 10px;
+
+            // Virtual padding for elements scrolled out of view
+            Rectangle {
+                height: offset * 110px;
+            }
 
             for name[index] in names: Entry {
                 name: name;
-                row: index / per-col;
-                col: Math.mod(index, per-col);
+            }
+
+            // Virtual padding for remaining elements not yet scrolled into view
+            Rectangle {
+                height: remaining * 110px;
             }
         }
 
@@ -89,9 +91,5 @@ export component Explorer inherits Window {
             width: Math.abs(ta.mouse-x - select.x);
             height: Math.abs(ta.mouse-y - select.y);
         }
-
-        // TODO: if scrolling, show the rectangle 
-
-        // TODO: scrolled() callback and use viewport-y in order to know what elements are displayed
     }
 }
