@@ -1,13 +1,23 @@
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::{fs, path::PathBuf};
 
-use slint::{ModelRc, SharedString, VecModel, Weak};
+use slint::{Image, Model, VecModel, Weak};
 
-use crate::ui::Explorer;
+use crate::icons::Icons;
+use crate::items::{Items, UIItem};
+use crate::ui::{self, Explorer};
 
-pub struct Item {
-    is_dir: bool,
-    name: SharedString,
+impl From<UIItem> for ui::ItemStruct {
+    fn from(item: UIItem) -> Self {
+        let icon_loaded = item.icon.is_some();
+        let icon = item.icon.map(Image::from_rgba8).unwrap_or_default();
+
+        Self {
+            name: item.name,
+            icon_loaded,
+            icon,
+        }
+    }
 }
 
 pub struct State {
@@ -15,7 +25,8 @@ pub struct State {
     offset: usize,
     limit: usize,
     cwd: PathBuf,
-    items: Vec<Item>,
+    items: Items,
+    icons: Icons,
     explorer: Weak<Explorer>,
 }
 
@@ -27,13 +38,18 @@ pub enum Message {
 impl State {
     pub fn new(explorer: Weak<Explorer>) -> (Self, Sender<Message>) {
         let (tx, rx) = mpsc::channel();
+        let cwd = std::env::current_dir().unwrap();
+        let mut items = Items::new();
+        items.load(&cwd);
+
         (
             Self {
                 recv: rx,
                 offset: 0,
                 limit: 0,
-                items: Vec::new(),
-                cwd: std::env::current_dir().unwrap(),
+                cwd,
+                items,
+                icons: Icons::new(),
                 explorer,
             },
             tx,
@@ -46,47 +62,29 @@ impl State {
         }
     }
 
-    pub fn load(&mut self) {
-        self.items = fs::read_dir(&self.cwd)
-            .unwrap()
-            .filter_map(|entry| {
-                if let Ok(entry) = entry
-                    && let Ok(name) = entry.file_name().into_string().map(SharedString::from)
-                    && let Ok(file_type) = entry.file_type()
-                {
-                    return Some(Item {
-                        name,
-                        is_dir: file_type.is_dir(),
-                    });
-                }
-                None
-            })
-            .collect();
-        self.items.sort_by_key(|item| item.name.to_lowercase());
-    }
-
-    fn update_ui(&self) {
-        // 1. Compute names slice to send to the frontend
-        let names = match self.items.len() <= self.offset {
-            true => vec![],
-            false => {
-                let end = (self.limit + self.offset).min(self.items.len());
-
-                self.items[self.offset..end]
-                    .iter()
-                    .map(|item| item.name.clone())
-                    .collect::<Vec<_>>()
-            }
-        };
+    fn update_ui(&mut self) {
+        // 1. Compute items cloned slice to send to the frontend
+        let new_items = self.items.slice(self.offset, self.limit, &mut self.icons);
         let remaining = self.items.len().saturating_sub(self.offset + self.limit);
 
         // 2. Send the cloned slice to the frontend
         self.explorer
             .upgrade_in_event_loop(move |explorer| {
                 explorer.set_remaining(remaining as i32);
-                explorer.set_names(ModelRc::new(VecModel::from(names)));
+                explorer
+                    .get_items()
+                    .as_any()
+                    .downcast_ref::<VecModel<ui::ItemStruct>>()
+                    .unwrap()
+                    .set_vec(
+                        new_items
+                            .into_iter()
+                            .map(|item| item.into())
+                            .collect::<Vec<ui::ItemStruct>>(),
+                    );
             })
             .unwrap();
+        self.icons.load();
     }
 
     fn handle(&mut self, message: Message) {

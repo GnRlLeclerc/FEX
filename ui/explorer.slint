@@ -1,6 +1,12 @@
 import { Button, ScrollView } from "std-widgets.slint";
+export struct ItemStruct {
+    name: string,
+    icon-loaded: bool,
+    icon: image,
+}
+
 component Entry inherits Rectangle {
-    in property <string> name;
+    in property <ItemStruct> item;
 
     background: ta.has-hover ? red : transparent;
 
@@ -15,24 +21,28 @@ component Entry inherits Rectangle {
         VerticalLayout {
             alignment: center;
 
-            Rectangle {
-                background: blue;
-
+            if item.icon-loaded: Image {
+                source: item.icon;
                 height: 50px;
                 width: 50px;
+            }
+
+            if !item.icon-loaded: Rectangle {
+                height: 50px;
+                width: 50px;
+                background: green;
             }
         }
 
         Text {
-            text: name;
+            text: item.name;
             vertical-alignment: center;
         }
     }
 }
 
 export component Explorer inherits Window {
-    in-out property <int> per-col: 5;
-    in property <[string]> names; // Only the displayed names
+    in property <[ItemStruct]> items;
 
     // Is set when selecting a rectangle of items
     out property <{x: length, y: length}> select;
@@ -67,8 +77,8 @@ export component Explorer inherits Window {
                 height: offset * 110px;
             }
 
-            for name[index] in names: Entry {
-                name: name;
+            for item[index] in items: Entry {
+                item: item;
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
