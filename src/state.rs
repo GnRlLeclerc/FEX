@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Image, Model, VecModel, Weak};
+use slint::{Image, Model, SharedString, VecModel, Weak};
 
 use crate::icons::Icons;
 use crate::items::{Items, UIItem};
 use crate::ui::{self, Explorer};
 
-impl From<UIItem> for ui::ItemStruct {
+impl From<UIItem> for ui::Item {
     fn from(item: UIItem) -> Self {
         let icon_loaded = item.icon.is_some();
         let icon = item.icon.map(Image::from_rgba8).unwrap_or_default();
@@ -70,6 +70,11 @@ impl State {
         // 1. Compute items cloned slice to send to the frontend
         let new_items = self.items.slice(self.offset, self.limit, &mut self.icons);
         let remaining = self.items.len().saturating_sub(self.offset + self.limit);
+        let cwd = self
+            .cwd
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string().into())
+            .collect::<Vec<SharedString>>();
 
         // 2. Send the cloned slice to the frontend
         self.explorer
@@ -78,14 +83,20 @@ impl State {
                 explorer
                     .get_items()
                     .as_any()
-                    .downcast_ref::<VecModel<ui::ItemStruct>>()
+                    .downcast_ref::<VecModel<ui::Item>>()
                     .unwrap()
                     .set_vec(
                         new_items
                             .into_iter()
                             .map(|item| item.into())
-                            .collect::<Vec<ui::ItemStruct>>(),
+                            .collect::<Vec<ui::Item>>(),
                     );
+                explorer
+                    .get_cwd()
+                    .as_any()
+                    .downcast_ref::<VecModel<SharedString>>()
+                    .unwrap()
+                    .set_vec(cwd);
             })
             .unwrap();
         self.icons.load();

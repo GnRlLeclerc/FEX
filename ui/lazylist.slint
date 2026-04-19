@@ -1,0 +1,65 @@
+import { Item, ItemView } from "./items.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component LazyList {
+    in property <[Item]> items;
+    in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
+    callback refresh(offset: int, limit: int);
+    callback open(id: int);
+
+    out property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
+    out property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
+    out property <{x: length, y: length}> select;
+    out property <bool> selecting: false;
+
+    changed offset => refresh(offset, limit);
+    changed limit => refresh(offset, limit);
+
+    scroll := ScrollView {
+        ta := TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    selecting = true;
+                    select = { x: ta.mouse-x, y: ta.mouse-y };
+                }
+                if event.kind == PointerEventKind.up {
+                    selecting = false;
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+
+            // Virtual padding for elements scrolled out of view
+            Rectangle {
+                height: offset * 110px;
+            }
+
+            for item[index] in items: ItemView {
+                item: item;
+                open(id) => open(id);
+            }
+
+            // Virtual padding for remaining elements not yet scrolled into view
+            Rectangle {
+                height: remaining * 110px;
+            }
+        }
+
+        // Selection rectangle
+        Rectangle {
+            visible: selecting;
+
+            border-color: green;
+            border-width: 2px;
+            border-radius: 5px;
+
+            x: Math.min(select.x, ta.mouse-x);
+            y: Math.min(select.y, ta.mouse-y);
+
+            width: Math.abs(ta.mouse-x - select.x);
+            height: Math.abs(ta.mouse-y - select.y);
+        }
+    }
+}

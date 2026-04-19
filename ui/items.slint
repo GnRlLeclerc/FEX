@@ -1,0 +1,45 @@
+export struct Item {
+    id: int,
+    name: string,
+    selected: bool,
+    icon-loaded: bool,
+    icon: image,
+}
+
+export component ItemView inherits Rectangle {
+    in property <Item> item;
+    callback open(id: int);
+
+    background: ta.has-hover ? red : item.selected ? grey : transparent;
+
+    height: 100px;
+    border-radius: 15px;
+
+    ta := TouchArea {
+        clicked => open(item.id);
+    }
+
+    HorizontalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+
+            if item.icon-loaded: Image {
+                source: item.icon;
+                height: 50px;
+                width: 50px;
+            }
+
+            if !item.icon-loaded: Rectangle {
+                height: 50px;
+                width: 50px;
+                background: green;
+            }
+        }
+
+        Text {
+            text: item.name;
+            vertical-alignment: center;
+        }
+    }
+}

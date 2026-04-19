@@ -1,115 +1,32 @@
 import { Button, ScrollView } from "std-widgets.slint";
-export struct ItemStruct {
-    id: int,
-    name: string,
-    icon-loaded: bool,
-    icon: image,
-    selected: bool,
-}
+import { Item } from "./items.slint";
+import { LazyList } from "./lazylist.slint";
 
-component Entry inherits Rectangle {
-    in property <ItemStruct> item;
-    callback open(id: int);
-
-    background: ta.has-hover ? red : transparent;
-    background: ta.has-hover ? red : item.selected ? grey : transparent;
-
-    height: 100px;
-    border-radius: 15px;
-
-    ta := TouchArea {
-        clicked => open(item.id);
-    }
-
-    // TODO: call callback on click ? or 
-
-    // For now, display as lines, easier to attempt the lazy scroll this way
-    HorizontalLayout {
-        spacing: 10px;
-        VerticalLayout {
-            alignment: center;
-
-            if item.icon-loaded: Image {
-                source: item.icon;
-                height: 50px;
-                width: 50px;
-            }
-
-            if !item.icon-loaded: Rectangle {
-                height: 50px;
-                width: 50px;
-                background: green;
-            }
-        }
-
-        Text {
-            text: item.name;
-            vertical-alignment: center;
-        }
-    }
-}
 
 export component Explorer inherits Window {
-    in property <[ItemStruct]> items;
+    in property <[Item]> items;
+    in property <[string]> cwd: ["aaa", "bbb", "ccc"];
+    in property <int> remaining: 0;
 
-    // Is set when selecting a rectangle of items
-    out property <{x: length, y: length}> select;
-    out property <bool> selecting: false;
-
-    out property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
-    out property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
-    in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
-
-    changed offset => refresh-slice(offset, limit);
-    changed limit => refresh-slice(offset, limit);
-    callback refresh-slice(offset: int, limit: int);
     callback open(id: int);
+    callback refresh(offset: int, limit: int);
 
-    scroll := ScrollView {
-        ta := TouchArea {
-            pointer-event(event) => {
-                if event.kind == PointerEventKind.down {
-                    selecting = true;
-                    select = { x: ta.mouse-x, y: ta.mouse-y };
-                }
-                if event.kind == PointerEventKind.up {
-                    selecting = false;
+    VerticalLayout {
+
+        ScrollView {
+            height: 50px;
+            HorizontalLayout {
+                for item in cwd: Button {
+                    text: item;
                 }
             }
         }
 
-        VerticalLayout {
-            spacing: 10px;
-
-            // Virtual padding for elements scrolled out of view
-            Rectangle {
-                height: offset * 110px;
-            }
-
-            for item[index] in items: Entry {
-                item: item;
-                open(id) => open(id);
-            }
-
-            // Virtual padding for remaining elements not yet scrolled into view
-            Rectangle {
-                height: remaining * 110px;
-            }
-        }
-
-        // Selection rectangle
-        Rectangle {
-            visible: selecting;
-
-            border-color: green;
-            border-width: 2px;
-            border-radius: 5px;
-
-            x: Math.min(select.x, ta.mouse-x);
-            y: Math.min(select.y, ta.mouse-y);
-
-            width: Math.abs(ta.mouse-x - select.x);
-            height: Math.abs(ta.mouse-y - select.y);
+        LazyList {
+            items: items;
+            remaining: remaining;
+            refresh(offset, limit) => refresh(offset, limit);
+            open(id) => open(id);
         }
     }
 }
