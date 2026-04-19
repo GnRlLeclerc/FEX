@@ -6,7 +6,7 @@ use std::{
 };
 
 use mime_guess::MimeGuess;
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
 
@@ -234,36 +234,45 @@ impl Items {
     }
 
     pub fn load(&mut self, path: &Path) {
-        let mut items = fs::read_dir(path)
-            .unwrap()
-            .par_bridge()
-            .filter_map(|entry| {
-                if let Ok(entry) = entry
-                    && let Ok(name) = entry.file_name().into_string().map(SharedString::from)
-                    && let Ok(file_type) = entry.file_type()
-                {
-                    let metadata = match file_type.is_dir() {
-                        true => Metadata::Folder {
-                            children: fs::read_dir(entry.path())
-                                .map(|iter| iter.count())
-                                .unwrap_or(0),
-                        },
-                        false => Metadata::File {
-                            mime: mime_guess::from_path(entry.path()),
-                            size: entry.metadata().map(|m| m.len()).unwrap_or(0),
-                        },
-                    };
+        // 1. Collect entries to be processed
+        let entries = fs::read_dir(path).unwrap().collect::<Vec<_>>();
 
-                    return Some(Item {
-                        key: ItemKey::null(),
-                        name,
-                        path: entry.path(),
-                        selected: false,
-                        metadata,
-                        icon: None,
-                    });
-                }
-                None
+        // 2. Process entries in parallel and collect them
+        let mut items = entries
+            .par_chunks(10_000)
+            .flat_map(|chunk| {
+                chunk
+                    .iter()
+                    .filter_map(|entry| {
+                        if let Ok(entry) = entry
+                            && let Ok(name) =
+                                entry.file_name().into_string().map(SharedString::from)
+                            && let Ok(file_type) = entry.file_type()
+                        {
+                            let metadata = match file_type.is_dir() {
+                                true => Metadata::Folder {
+                                    children: fs::read_dir(entry.path())
+                                        .map(|iter| iter.count())
+                                        .unwrap_or(0),
+                                },
+                                false => Metadata::File {
+                                    mime: mime_guess::from_path(entry.path()),
+                                    size: entry.metadata().map(|m| m.len()).unwrap_or(0),
+                                },
+                            };
+
+                            return Some(Item {
+                                key: ItemKey::null(),
+                                name,
+                                path: entry.path(),
+                                selected: false,
+                                metadata,
+                                icon: None,
+                            });
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
