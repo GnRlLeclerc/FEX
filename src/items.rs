@@ -38,8 +38,8 @@ pub enum SortBy {
 
 #[derive(Default, Eq, PartialEq)]
 pub enum SortOrder {
-    Ascending,
     #[default]
+    Ascending,
     Descending,
 }
 
@@ -54,7 +54,7 @@ impl Sort {
         let ordering = match (&a.metadata, &b.metadata, &self.by) {
             (Metadata::Folder { .. }, Metadata::File { .. }, _) => return Ordering::Less,
             (Metadata::File { .. }, Metadata::Folder { .. }, _) => return Ordering::Greater,
-            (_, _, SortBy::Name) => a.name.cmp(&b.name),
+            (_, _, SortBy::Name) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
             (Metadata::File { size: a, .. }, Metadata::File { size: b, .. }, SortBy::Size) => {
                 a.cmp(b)
             }

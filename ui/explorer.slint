@@ -9,6 +9,7 @@ export component Explorer inherits Window {
     in property <int> remaining: 0;
 
     callback open(id: int);
+    callback navigate(count: int); // navigate to the i-th cwd component
     callback refresh(offset: int, limit: int);
 
     VerticalLayout {
@@ -16,8 +17,9 @@ export component Explorer inherits Window {
         ScrollView {
             height: 50px;
             HorizontalLayout {
-                for item in cwd: Button {
+                for item[index] in cwd: Button {
                     text: item;
+                    clicked => navigate(index);
                 }
             }
         }

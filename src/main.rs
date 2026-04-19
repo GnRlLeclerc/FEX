@@ -31,6 +31,14 @@ fn main() {
         txc.send(Message::Open { id: id as u64 }).unwrap();
     });
 
+    let txc = tx.clone();
+    explorer.on_navigate(move |subcomponent| {
+        txc.send(Message::Navigate {
+            subcomponent: subcomponent as usize,
+        })
+        .unwrap();
+    });
+
     let _ = thread::spawn(move || {
         state.event_loop();
     });

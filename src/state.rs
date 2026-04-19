@@ -37,6 +37,8 @@ pub enum Message {
     RefreshSlice { offset: usize, limit: usize },
     /// Item clicked
     Open { id: u64 },
+    /// Navigate to path subcomponent
+    Navigate { subcomponent: usize },
 }
 
 impl State {
@@ -117,6 +119,13 @@ impl State {
                     self.items.load(&self.cwd);
                     self.update_ui();
                 }
+            }
+            Message::Navigate { subcomponent } => {
+                self.cwd = self.cwd.components().take(subcomponent + 1).collect();
+                self.items.reset();
+                self.update_ui();
+                self.items.load(&self.cwd);
+                self.update_ui();
             }
         }
     }
