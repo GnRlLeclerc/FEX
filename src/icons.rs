@@ -16,9 +16,9 @@ use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 
 pub struct Icons {
     /// Icons pending to be loaded in the background
-    pending: HashSet<SharedString>,
+    pending: HashSet<String>,
     /// Icon cache by mimetype
-    cache: HashMap<SharedString, SharedPixelBuffer<Rgba8Pixel>>,
+    cache: HashMap<String, SharedPixelBuffer<Rgba8Pixel>>,
     theme: String,
     size: u32,
     options: usvg::Options<'static>,
@@ -36,11 +36,11 @@ impl Icons {
     }
 
     /// Get an icon by mimetype, add the mimetype to the pending list if not already in cache
-    pub fn get(&mut self, mime: &SharedString) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
+    pub fn get(&mut self, mime: &str) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
         match self.cache.get(mime) {
             Some(icon) => Some(icon.clone()),
             None => {
-                self.pending.insert(mime.clone());
+                self.pending.insert(mime.into());
                 None
             }
         }
@@ -52,7 +52,10 @@ impl Icons {
             .pending
             .par_iter()
             .filter_map(|mime| {
-                let path = lookup(mime).with_size(512).with_theme(&self.theme).find()?;
+                let path = lookup(&mime)
+                    .with_size(512)
+                    .with_theme(&self.theme)
+                    .find()?;
 
                 let icon_mime = mime_guess::from_path(&path).first()?;
                 let icon = match icon_mime == mime::IMAGE_SVG {

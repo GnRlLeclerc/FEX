@@ -14,6 +14,7 @@ impl From<UIItem> for ui::ItemStruct {
 
         Self {
             name: item.name,
+            selected: item.selected,
             icon_loaded,
             icon,
         }

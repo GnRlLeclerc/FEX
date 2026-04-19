@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use mime::Mime;
+use mime_guess::MimeGuess;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{SlotMap, new_key_type};
@@ -19,7 +19,7 @@ new_key_type! {
 #[derive(Clone)]
 pub enum Metadata {
     Folder { children: usize },
-    File { mime: Option<Mime>, size: u64 },
+    File { mime: MimeGuess, size: u64 },
 }
 
 impl Metadata {
@@ -62,7 +62,7 @@ impl Sort {
                 a.cmp(b)
             }
             (Metadata::File { mime: a, .. }, Metadata::File { mime: b, .. }, SortBy::Type) => {
-                a.cmp(b)
+                a.iter_raw().cmp(b.iter_raw())
             }
             _ => Ordering::Equal,
         };
@@ -107,15 +107,21 @@ impl From<&Item> for UIItem {
 impl Item {
     pub fn try_load_icon(&mut self, icons: &mut Icons) {
         if self.icon.is_none() {
-            let mime = match &self.metadata {
-                Metadata::Folder { .. } => "folder".to_string(),
-                Metadata::File { mime, .. } => mime
-                    .as_ref()
-                    .map(|m| m.to_string())
-                    .unwrap_or_else(|| "unknown".to_string()),
-            }
-            .into();
-            self.icon = icons.get(&mime);
+            match &self.metadata {
+                Metadata::Folder { .. } => self.icon = icons.get("folder"),
+                Metadata::File { mime, .. } => {
+                    if mime.is_empty() {
+                        self.icon = icons.get("application-x-core");
+                    } else {
+                        for mime in mime.iter_raw() {
+                            if let Some(icon) = icons.get(mime.replace('/', "-").as_str()) {
+                                self.icon = Some(icon);
+                                break;
+                            }
+                        }
+                    }
+                }
+            };
         }
     }
 }
@@ -226,7 +232,7 @@ impl Items {
                                 .unwrap_or(0),
                         },
                         false => Metadata::File {
-                            mime: mime_guess::from_path(entry.path()).first(),
+                            mime: mime_guess::from_path(entry.path()),
                             size: entry.metadata().map(|m| m.len()).unwrap_or(0),
                         },
                     };
