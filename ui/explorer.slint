@@ -1,5 +1,5 @@
 import { Button, ScrollView } from "std-widgets.slint";
-import { Item } from "./items.slint";
+import { Item, ItemKey } from "./items.slint";
 import { LazyList } from "./lazylist.slint";
 
 
@@ -8,7 +8,7 @@ export component Explorer inherits Window {
     in property <[string]> cwd: ["aaa", "bbb", "ccc"];
     in property <int> remaining: 0;
 
-    callback open(id: int);
+    callback open(key: ItemKey);
     callback navigate(count: int); // navigate to the i-th cwd component
     callback refresh(offset: int, limit: int);
 
@@ -28,7 +28,7 @@ export component Explorer inherits Window {
             items: items;
             remaining: remaining;
             refresh(offset, limit) => refresh(offset, limit);
-            open(id) => open(id);
+            open(key) => open(key);
         }
     }
 }

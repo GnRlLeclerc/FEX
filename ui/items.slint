@@ -1,5 +1,11 @@
+/// Item key u64 workaround
+export struct ItemKey {
+    upper: int,
+    lower: int,
+}
+
 export struct Item {
-    id: int,
+    key: ItemKey,
     name: string,
     selected: bool,
     icon-loaded: bool,
@@ -8,7 +14,7 @@ export struct Item {
 
 export component ItemView inherits Rectangle {
     in property <Item> item;
-    callback open(id: int);
+    callback open(key: ItemKey);
 
     background: ta.has-hover ? red : item.selected ? grey : transparent;
 
@@ -16,7 +22,7 @@ export component ItemView inherits Rectangle {
     border-radius: 15px;
 
     ta := TouchArea {
-        clicked => open(item.id);
+        clicked => open(item.key);
     }
 
     HorizontalLayout {

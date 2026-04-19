@@ -12,7 +12,7 @@ use std::{
 use freedesktop_icons::lookup;
 use linicon_theme::get_icon_theme;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
+use slint::{Rgba8Pixel, SharedPixelBuffer};
 
 pub struct Icons {
     /// Icons pending to be loaded in the background

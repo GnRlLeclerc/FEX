@@ -1,11 +1,11 @@
-import { Item, ItemView } from "./items.slint";
+import { Item, ItemView, ItemKey } from "./items.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component LazyList {
     in property <[Item]> items;
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
     callback refresh(offset: int, limit: int);
-    callback open(id: int);
+    callback open(key: ItemKey);
 
     out property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
     out property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
@@ -38,7 +38,7 @@ export component LazyList {
 
             for item[index] in items: ItemView {
                 item: item;
-                open(id) => open(id);
+                open(key) => open(key);
             }
 
             // Virtual padding for remaining elements not yet scrolled into view

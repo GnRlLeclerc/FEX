@@ -10,7 +10,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
 
-use crate::icons::Icons;
+use crate::{icons::Icons, ui};
 
 new_key_type! {
     pub struct ItemKey;
@@ -75,7 +75,7 @@ impl Sort {
 }
 
 struct Item {
-    id: ItemKey,
+    key: ItemKey,
     name: SharedString,
     path: PathBuf,
     selected: bool,
@@ -87,7 +87,7 @@ struct Item {
 /// A more lightweight version of Item, to be cloned and sent to the UI
 /// (basically, the PathBuf has been removed)
 pub struct UIItem {
-    pub id: u64,
+    pub key: ui::ItemKey,
     pub name: SharedString,
     pub selected: bool,
     pub metadata: Metadata,
@@ -97,8 +97,12 @@ pub struct UIItem {
 
 impl From<&Item> for UIItem {
     fn from(item: &Item) -> Self {
+        let i = item.key.data().as_ffi();
         Self {
-            id: item.id.data().as_ffi(),
+            key: ui::ItemKey {
+                lower: i as i32,
+                upper: (i >> 32) as i32,
+            },
             name: item.name.clone(),
             selected: item.selected,
             metadata: item.metadata.clone(),
@@ -152,8 +156,9 @@ impl Items {
         self.items.len()
     }
 
-    pub fn open(&self, key: u64) -> Option<&Path> {
-        let key = ItemKey::from(KeyData::from_ffi(key));
+    pub fn open(&self, key: ui::ItemKey) -> Option<&Path> {
+        let i = ((key.upper as u64) << 32) | (key.lower as u64);
+        let key = ItemKey::from(KeyData::from_ffi(i));
         if let Some(item) = self.items.get(key)
             && let Metadata::Folder { .. } = item.metadata
         {
@@ -195,8 +200,9 @@ impl Items {
         }
     }
 
-    pub fn add(&mut self, item: Item) -> ItemKey {
+    pub fn add(&mut self, item: Item) {
         let key = self.items.insert(item);
+        self.items[key].key = key;
         let item = &self.items[key];
         self.by_path.insert(item.path.clone(), key);
 
@@ -205,8 +211,6 @@ impl Items {
             .binary_search_by(|key| self.sort.compare(&item, &self.items[*key]))
             .unwrap_or_else(|e| e);
         self.ordered.insert(index, key);
-
-        key
     }
 
     pub fn reset(&mut self) {
@@ -251,7 +255,7 @@ impl Items {
                     };
 
                     return Some(Item {
-                        id: ItemKey::null(),
+                        key: ItemKey::null(),
                         name,
                         path: entry.path(),
                         selected: false,
@@ -269,8 +273,8 @@ impl Items {
         // Insert into containers
         items.into_iter().for_each(|item| {
             let key = self.items.insert(item);
+            self.items[key].key = key;
             let item = &mut self.items[key];
-            item.id = key;
             self.by_path.insert(item.path.clone(), key);
             self.ordered.push(key);
         });

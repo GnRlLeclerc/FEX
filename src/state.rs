@@ -13,7 +13,7 @@ impl From<UIItem> for ui::Item {
         let icon = item.icon.map(Image::from_rgba8).unwrap_or_default();
 
         Self {
-            id: item.id as i32,
+            key: item.key,
             name: item.name,
             selected: item.selected,
             icon_loaded,
@@ -36,7 +36,7 @@ pub enum Message {
     /// UI scroll changed enough to display different elements
     RefreshSlice { offset: usize, limit: usize },
     /// Item clicked
-    Open { id: u64 },
+    Open { key: ui::ItemKey },
     /// Navigate to path subcomponent
     Navigate { subcomponent: usize },
 }
@@ -111,8 +111,8 @@ impl State {
                 self.limit = limit;
                 self.update_ui();
             }
-            Message::Open { id } => {
-                if let Some(path) = self.items.open(id) {
+            Message::Open { key } => {
+                if let Some(path) = self.items.open(key) {
                     self.cwd = path.to_path_buf();
                     self.items.reset();
                     self.update_ui();

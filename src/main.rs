@@ -27,8 +27,8 @@ fn main() {
     });
 
     let txc = tx.clone();
-    explorer.on_open(move |id| {
-        txc.send(Message::Open { id: id as u64 }).unwrap();
+    explorer.on_open(move |key| {
+        txc.send(Message::Open { key }).unwrap();
     });
 
     let txc = tx.clone();
