@@ -8,7 +8,7 @@ use std::{
 use mime_guess::MimeGuess;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
-use slotmap::{SlotMap, new_key_type};
+use slotmap::{Key, KeyData, SlotMap, new_key_type};
 
 use crate::icons::Icons;
 
@@ -75,6 +75,7 @@ impl Sort {
 }
 
 struct Item {
+    id: ItemKey,
     name: SharedString,
     path: PathBuf,
     selected: bool,
@@ -86,6 +87,7 @@ struct Item {
 /// A more lightweight version of Item, to be cloned and sent to the UI
 /// (basically, the PathBuf has been removed)
 pub struct UIItem {
+    pub id: u64,
     pub name: SharedString,
     pub selected: bool,
     pub metadata: Metadata,
@@ -96,6 +98,7 @@ pub struct UIItem {
 impl From<&Item> for UIItem {
     fn from(item: &Item) -> Self {
         Self {
+            id: item.id.data().as_ffi(),
             name: item.name.clone(),
             selected: item.selected,
             metadata: item.metadata.clone(),
@@ -147,6 +150,16 @@ impl Items {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn open(&self, key: u64) -> Option<&Path> {
+        let key = ItemKey::from(KeyData::from_ffi(key));
+        if let Some(item) = self.items.get(key)
+            && let Metadata::Folder { .. } = item.metadata
+        {
+            return Some(&item.path);
+        }
+        None
     }
 
     pub fn select_all(&mut self) {
@@ -238,6 +251,7 @@ impl Items {
                     };
 
                     return Some(Item {
+                        id: ItemKey::null(),
                         name,
                         path: entry.path(),
                         selected: false,
@@ -255,7 +269,8 @@ impl Items {
         // Insert into containers
         items.into_iter().for_each(|item| {
             let key = self.items.insert(item);
-            let item = &self.items[key];
+            let item = &mut self.items[key];
+            item.id = key;
             self.by_path.insert(item.path.clone(), key);
             self.ordered.push(key);
         });

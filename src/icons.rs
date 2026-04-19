@@ -47,7 +47,7 @@ impl Icons {
     }
 
     /// Load pending icons in parallel
-    pub fn load(&mut self) {
+    pub fn load(&mut self) -> bool {
         let loaded = self
             .pending
             .par_iter()
@@ -82,8 +82,14 @@ impl Icons {
                 Some((mime.to_string().into(), icon))
             })
             .collect::<Vec<_>>();
-        self.pending.clear();
 
+        if loaded.is_empty() {
+            return false;
+        }
+
+        self.pending.clear();
         self.cache.extend(loaded);
+
+        true
     }
 }

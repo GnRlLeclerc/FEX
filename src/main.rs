@@ -16,12 +16,18 @@ fn main() {
     let weak = explorer.as_weak();
     let (mut state, tx) = State::new(weak);
 
+    let txc = tx.clone();
     explorer.on_refresh_slice(move |offset, limit| {
-        tx.send(Message::RefreshSlice {
+        txc.send(Message::RefreshSlice {
             offset: offset as usize,
             limit: limit as usize,
         })
         .unwrap();
+    });
+
+    let txc = tx.clone();
+    explorer.on_open(move |id| {
+        txc.send(Message::Open { id: id as u64 }).unwrap();
     });
 
     let _ = thread::spawn(move || {

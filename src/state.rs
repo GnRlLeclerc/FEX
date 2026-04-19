@@ -13,6 +13,7 @@ impl From<UIItem> for ui::ItemStruct {
         let icon = item.icon.map(Image::from_rgba8).unwrap_or_default();
 
         Self {
+            id: item.id as i32,
             name: item.name,
             selected: item.selected,
             icon_loaded,
@@ -34,6 +35,8 @@ pub struct State {
 pub enum Message {
     /// UI scroll changed enough to display different elements
     RefreshSlice { offset: usize, limit: usize },
+    /// Item clicked
+    Open { id: u64 },
 }
 
 impl State {
@@ -93,8 +96,16 @@ impl State {
             Message::RefreshSlice { offset, limit } => {
                 self.offset = offset;
                 self.limit = limit;
-
                 self.update_ui();
+            }
+            Message::Open { id } => {
+                if let Some(path) = self.items.open(id) {
+                    self.cwd = path.to_path_buf();
+                    self.items.reset();
+                    self.update_ui();
+                    self.items.load(&self.cwd);
+                    self.update_ui();
+                }
             }
         }
     }

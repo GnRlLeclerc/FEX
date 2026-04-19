@@ -1,5 +1,6 @@
 import { Button, ScrollView } from "std-widgets.slint";
 export struct ItemStruct {
+    id: int,
     name: string,
     icon-loaded: bool,
     icon: image,
@@ -8,13 +9,19 @@ export struct ItemStruct {
 
 component Entry inherits Rectangle {
     in property <ItemStruct> item;
+    callback open(id: int);
 
     background: ta.has-hover ? red : transparent;
+    background: ta.has-hover ? red : item.selected ? grey : transparent;
 
     height: 100px;
     border-radius: 15px;
 
-    ta := TouchArea { }
+    ta := TouchArea {
+        clicked => open(item.id);
+    }
+
+    // TODO: call callback on click ? or 
 
     // For now, display as lines, easier to attempt the lazy scroll this way
     HorizontalLayout {
@@ -56,6 +63,7 @@ export component Explorer inherits Window {
     changed offset => refresh-slice(offset, limit);
     changed limit => refresh-slice(offset, limit);
     callback refresh-slice(offset: int, limit: int);
+    callback open(id: int);
 
     scroll := ScrollView {
         ta := TouchArea {
@@ -80,6 +88,7 @@ export component Explorer inherits Window {
 
             for item[index] in items: Entry {
                 item: item;
+                open(id) => open(id);
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
