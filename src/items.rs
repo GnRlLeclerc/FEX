@@ -1,16 +1,15 @@
 use std::{
-    cmp::Ordering,
     collections::{HashMap, HashSet},
-    fs,
+    fs::{self, DirEntry},
     path::{Path, PathBuf},
 };
 
-use mime_guess::MimeGuess;
+use mime::Mime;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
 
-use crate::{icons::Icons, ui};
+use crate::{icons::Icons, sort::Sort, ui};
 
 new_key_type! {
     pub struct ItemKey;
@@ -19,7 +18,7 @@ new_key_type! {
 #[derive(Clone)]
 pub enum Metadata {
     Folder { children: usize },
-    File { mime: MimeGuess, size: u64 },
+    File { mimes: Vec<Mime>, size: u64 },
 }
 
 impl Metadata {
@@ -28,60 +27,28 @@ impl Metadata {
     }
 }
 
-#[derive(Default, Eq, PartialEq)]
-pub enum SortBy {
-    #[default]
-    Name,
-    Type,
-    Size,
+/// Item icon.
+pub enum Icon {
+    /// Folders or files with icons.
+    /// Loaded on the UI thread, with Slint's builtin path-based cache.
+    /// Necessary to handle SVG icons without rasterizing them,
+    /// because slint's Image cannot be sent between threads,
+    /// and Image cannot be created from SVG content without
+    /// processing it again every time.
+    Path(PathBuf),
+    /// Images with precomputed thumbnails.
+    /// Not cached in the background thread,
+    /// because they are likely unique and not reused across images.
+    Thumbnail(SharedPixelBuffer<Rgba8Pixel>),
 }
 
-#[derive(Default, Eq, PartialEq)]
-pub enum SortOrder {
-    #[default]
-    Ascending,
-    Descending,
-}
-
-#[derive(Default, Eq, PartialEq)]
-pub struct Sort {
-    by: SortBy,
-    order: SortOrder,
-}
-
-impl Sort {
-    pub fn compare(&self, a: &Item, b: &Item) -> Ordering {
-        let ordering = match (&a.metadata, &b.metadata, &self.by) {
-            (Metadata::Folder { .. }, Metadata::File { .. }, _) => return Ordering::Less,
-            (Metadata::File { .. }, Metadata::Folder { .. }, _) => return Ordering::Greater,
-            (_, _, SortBy::Name) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-            (Metadata::File { size: a, .. }, Metadata::File { size: b, .. }, SortBy::Size) => {
-                a.cmp(b)
-            }
-            (Metadata::Folder { children: a }, Metadata::Folder { children: b }, SortBy::Size) => {
-                a.cmp(b)
-            }
-            (Metadata::File { mime: a, .. }, Metadata::File { mime: b, .. }, SortBy::Type) => {
-                a.iter_raw().cmp(b.iter_raw())
-            }
-            _ => Ordering::Equal,
-        };
-
-        match self.order {
-            SortOrder::Ascending => ordering,
-            SortOrder::Descending => ordering.reverse(),
-        }
-    }
-}
-
-struct Item {
+pub struct Item {
     key: ItemKey,
-    name: SharedString,
     path: PathBuf,
     selected: bool,
-    metadata: Metadata,
-    /// Lazily computed icon
-    icon: Option<SharedPixelBuffer<Rgba8Pixel>>,
+    pub name: SharedString,
+    pub metadata: Metadata,
+    icon: Icon,
 }
 
 /// A more lightweight version of Item, to be cloned and sent to the UI
@@ -135,6 +102,7 @@ impl Item {
 
 pub struct Items {
     sort: Sort,
+    icons: Icons,
     items: SlotMap<ItemKey, Item>,
     by_path: HashMap<PathBuf, ItemKey>,
     selected: HashSet<ItemKey>,
@@ -145,6 +113,7 @@ impl Items {
     pub fn new() -> Self {
         Self {
             sort: Sort::default(),
+            icons: Icons::new("Papirus".into()),
             items: SlotMap::with_key(),
             by_path: HashMap::new(),
             selected: HashSet::new(),
@@ -242,35 +211,12 @@ impl Items {
             .par_chunks(10_000)
             .flat_map(|chunk| {
                 chunk
-                    .iter()
+                    .into_iter()
                     .filter_map(|entry| {
-                        if let Ok(entry) = entry
-                            && let Ok(name) =
-                                entry.file_name().into_string().map(SharedString::from)
-                            && let Ok(file_type) = entry.file_type()
-                        {
-                            let metadata = match file_type.is_dir() {
-                                true => Metadata::Folder {
-                                    children: fs::read_dir(entry.path())
-                                        .map(|iter| iter.count())
-                                        .unwrap_or(0),
-                                },
-                                false => Metadata::File {
-                                    mime: mime_guess::from_path(entry.path()),
-                                    size: entry.metadata().map(|m| m.len()).unwrap_or(0),
-                                },
-                            };
-
-                            return Some(Item {
-                                key: ItemKey::null(),
-                                name,
-                                path: entry.path(),
-                                selected: false,
-                                metadata,
-                                icon: None,
-                            });
-                        }
-                        None
+                        entry
+                            .as_ref()
+                            .ok()
+                            .and_then(|e| process_entry(e, &self.icons))
                     })
                     .collect::<Vec<_>>()
             })
@@ -288,4 +234,40 @@ impl Items {
             self.ordered.push(key);
         });
     }
+}
+
+fn process_entry(entry: &DirEntry, icons: &Icons) -> Option<Item> {
+    let name: SharedString = entry.file_name().to_string_lossy().to_string().into();
+    let meta = fs::metadata(entry.path()).ok()?;
+
+    let (metadata, icon) = match meta.is_dir() {
+        true => (
+            Metadata::Folder {
+                children: fs::read_dir(entry.path())
+                    .map(|iter| iter.count())
+                    .unwrap_or(0),
+            },
+            Icon::Path(icons.get_folder()),
+        ),
+        false => {
+            let mimes = icons.get_mimes(&name);
+            let icon = icons.get_icon(&mimes);
+            (
+                Metadata::File {
+                    mimes,
+                    size: entry.metadata().map(|m| m.len()).unwrap_or(0),
+                },
+                Icon::Path(icon),
+            )
+        }
+    };
+
+    Some(Item {
+        key: ItemKey::null(),
+        name,
+        path: entry.path(),
+        selected: false,
+        metadata,
+        icon,
+    })
 }

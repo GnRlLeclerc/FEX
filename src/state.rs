@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Image, Model, SharedString, VecModel, Weak};
+use slint::{Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
 
-use crate::icons::Icons;
-use crate::items::{Items, UIItem};
+use crate::items::{ItemKey, Items, UIItem};
 use crate::ui::{self, Explorer};
 
 impl From<UIItem> for ui::Item {
@@ -28,7 +27,6 @@ pub struct State {
     limit: usize,
     cwd: PathBuf,
     items: Items,
-    icons: Icons,
     explorer: Weak<Explorer>,
 }
 
@@ -39,6 +37,11 @@ pub enum Message {
     Open { key: ui::ItemKey },
     /// Navigate to path subcomponent
     Navigate { subcomponent: usize },
+    /// Thumbnail loaded for an image
+    ThumbnailLoaded {
+        key: ItemKey,
+        buffer: SharedPixelBuffer<Rgba8Pixel>,
+    },
 }
 
 impl State {
@@ -55,7 +58,6 @@ impl State {
                 limit: 0,
                 cwd,
                 items,
-                icons: Icons::new(),
                 explorer,
             },
             tx,

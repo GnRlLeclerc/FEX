@@ -4,9 +4,12 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::state::{Message, State};
 
+mod config;
 mod icons;
 mod items;
+mod sort;
 mod state;
+mod thumbnails;
 mod ui;
 
 fn main() {
