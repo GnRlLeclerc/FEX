@@ -1,25 +1,10 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
+use slint::{Model, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
 
-use crate::items::{ItemKey, Items, UIItem};
+use crate::items::{ItemKey, Items};
 use crate::ui::{self, Explorer};
-
-impl From<UIItem> for ui::Item {
-    fn from(item: UIItem) -> Self {
-        let icon_loaded = item.icon.is_some();
-        let icon = item.icon.map(Image::from_rgba8).unwrap_or_default();
-
-        Self {
-            key: item.key,
-            name: item.name,
-            selected: item.selected,
-            icon_loaded,
-            icon,
-        }
-    }
-}
 
 pub struct State {
     recv: Receiver<Message>,
@@ -72,7 +57,7 @@ impl State {
 
     fn update_ui(&mut self) {
         // 1. Compute items cloned slice to send to the frontend
-        let new_items = self.items.slice(self.offset, self.limit, &mut self.icons);
+        let new_items = self.items.slice(self.offset, self.limit);
         let remaining = self.items.len().saturating_sub(self.offset + self.limit);
         let cwd = self
             .cwd
@@ -103,7 +88,6 @@ impl State {
                     .set_vec(cwd);
             })
             .unwrap();
-        self.icons.load();
     }
 
     fn handle(&mut self, message: Message) {
@@ -128,6 +112,10 @@ impl State {
                 self.update_ui();
                 self.items.load(&self.cwd);
                 self.update_ui();
+            }
+            Message::ThumbnailLoaded { key, buffer } => {
+                // TODO: update inner image, and iterate over displayed images
+                // on the UI thread in order to potentially update in place the thumbnail
             }
         }
     }

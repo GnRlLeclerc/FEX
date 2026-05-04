@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs::{self, DirEntry},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use mime::Mime;
@@ -9,7 +10,11 @@ use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
 
-use crate::{icons::Icons, sort::Sort, ui};
+use crate::{
+    icons::Icons,
+    sort::Sort,
+    ui::{self, ItemData},
+};
 
 new_key_type! {
     pub struct ItemKey;
@@ -28,6 +33,7 @@ impl Metadata {
 }
 
 /// Item icon.
+#[derive(Clone)]
 pub enum Icon {
     /// Folders or files with icons.
     /// Loaded on the UI thread, with Slint's builtin path-based cache.
@@ -35,7 +41,11 @@ pub enum Icon {
     /// because slint's Image cannot be sent between threads,
     /// and Image cannot be created from SVG content without
     /// processing it again every time.
-    Path(PathBuf),
+    ///
+    /// Because the path will be copied to the UI thread
+    /// every time an item scrolls into view, we use Arc
+    /// to make it cheap.
+    Path(Arc<PathBuf>),
     /// Images with precomputed thumbnails.
     /// Not cached in the background thread,
     /// because they are likely unique and not reused across images.
@@ -43,61 +53,12 @@ pub enum Icon {
 }
 
 pub struct Item {
-    key: ItemKey,
+    pub key: ItemKey,
     path: PathBuf,
     selected: bool,
     pub name: SharedString,
     pub metadata: Metadata,
-    icon: Icon,
-}
-
-/// A more lightweight version of Item, to be cloned and sent to the UI
-/// (basically, the PathBuf has been removed)
-pub struct UIItem {
-    pub key: ui::ItemKey,
-    pub name: SharedString,
-    pub selected: bool,
-    pub metadata: Metadata,
-    /// Lazily computed icon
-    pub icon: Option<SharedPixelBuffer<Rgba8Pixel>>,
-}
-
-impl From<&Item> for UIItem {
-    fn from(item: &Item) -> Self {
-        let i = item.key.data().as_ffi();
-        Self {
-            key: ui::ItemKey {
-                lower: i as i32,
-                upper: (i >> 32) as i32,
-            },
-            name: item.name.clone(),
-            selected: item.selected,
-            metadata: item.metadata.clone(),
-            icon: item.icon.clone(),
-        }
-    }
-}
-
-impl Item {
-    pub fn try_load_icon(&mut self, icons: &mut Icons) {
-        if self.icon.is_none() {
-            match &self.metadata {
-                Metadata::Folder { .. } => self.icon = icons.get("folder"),
-                Metadata::File { mime, .. } => {
-                    if mime.is_empty() {
-                        self.icon = icons.get("application-x-core");
-                    } else {
-                        for mime in mime.iter_raw() {
-                            if let Some(icon) = icons.get(mime.replace('/', "-").as_str()) {
-                                self.icon = Some(icon);
-                                break;
-                            }
-                        }
-                    }
-                }
-            };
-        }
-    }
+    pub icon: Icon,
 }
 
 pub struct Items {
@@ -147,17 +108,13 @@ impl Items {
         self.selected.clear();
     }
 
-    /// Get a slice of items ready to be sent to the UI, and trigger icon lazy loading
-    pub fn slice(&mut self, offset: usize, limit: usize, icons: &mut Icons) -> Vec<UIItem> {
+    /// Get a slice of items ready to be sent to the UI
+    pub fn slice(&mut self, offset: usize, limit: usize) -> Vec<ItemData> {
         self.ordered
             .iter_mut()
             .skip(offset)
             .take(limit)
-            .map(|key| {
-                let item = &mut self.items[*key];
-                item.try_load_icon(icons);
-                (&*item).into()
-            })
+            .map(|key| (&self.items[*key]).into())
             .collect()
     }
 
@@ -247,7 +204,7 @@ fn process_entry(entry: &DirEntry, icons: &Icons) -> Option<Item> {
                     .map(|iter| iter.count())
                     .unwrap_or(0),
             },
-            Icon::Path(icons.get_folder()),
+            Icon::Path(icons.get_folder().into()),
         ),
         false => {
             let mimes = icons.get_mimes(&name);
@@ -257,7 +214,7 @@ fn process_entry(entry: &DirEntry, icons: &Icons) -> Option<Item> {
                     mimes,
                     size: entry.metadata().map(|m| m.len()).unwrap_or(0),
                 },
-                Icon::Path(icon),
+                Icon::Path(icon.into()),
             )
         }
     };

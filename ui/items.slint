@@ -8,7 +8,6 @@ export struct Item {
     key: ItemKey,
     name: string,
     selected: bool,
-    icon-loaded: bool,
     icon: image,
 }
 
@@ -30,16 +29,10 @@ export component ItemView inherits Rectangle {
         VerticalLayout {
             alignment: center;
 
-            if item.icon-loaded: Image {
+            Image {
                 source: item.icon;
                 height: 50px;
                 width: 50px;
-            }
-
-            if !item.icon-loaded: Rectangle {
-                height: 50px;
-                width: 50px;
-                background: green;
             }
         }
 
