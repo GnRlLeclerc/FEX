@@ -69,23 +69,14 @@ impl State {
         self.explorer
             .upgrade_in_event_loop(move |explorer| {
                 explorer.set_remaining(remaining as i32);
-                explorer
-                    .get_items()
-                    .as_any()
-                    .downcast_ref::<VecModel<ui::Item>>()
-                    .unwrap()
-                    .set_vec(
-                        new_items
-                            .into_iter()
-                            .map(|item| item.into())
-                            .collect::<Vec<ui::Item>>(),
-                    );
-                explorer
-                    .get_cwd()
-                    .as_any()
-                    .downcast_ref::<VecModel<SharedString>>()
-                    .unwrap()
-                    .set_vec(cwd);
+                downcast_vec(&explorer.get_items()).set_vec(
+                    new_items
+                        .into_iter()
+                        .map(|item| item.into())
+                        .collect::<Vec<_>>(),
+                );
+
+                downcast_vec(&explorer.get_cwd()).set_vec(cwd);
             })
             .unwrap();
     }
@@ -114,9 +105,14 @@ impl State {
                 self.update_ui();
             }
             Message::ThumbnailLoaded { key, buffer } => {
+                self.items.set_thumbnail(key, buffer);
                 // TODO: update inner image, and iterate over displayed images
                 // on the UI thread in order to potentially update in place the thumbnail
             }
         }
     }
+}
+
+fn downcast_vec<T: 'static>(model: &ModelRc<T>) -> &VecModel<T> {
+    model.as_any().downcast_ref::<VecModel<T>>().unwrap()
 }

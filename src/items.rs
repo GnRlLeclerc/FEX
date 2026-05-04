@@ -97,6 +97,10 @@ impl Items {
         None
     }
 
+    pub fn set_thumbnail(&mut self, key: ItemKey, buffer: SharedPixelBuffer<Rgba8Pixel>) {
+        self.items[key].icon = Icon::Thumbnail(buffer);
+    }
+
     pub fn select_all(&mut self) {
         self.selected = self.items.keys().collect();
     }
