@@ -12,6 +12,12 @@ export component Explorer inherits Window {
     callback navigate(count: int); // navigate to the i-th cwd component
     callback refresh(offset: int, limit: int);
 
+    // Reset scroll (call this after navigating)
+    public function reset-scroll() {
+        lazy.reset-scroll();
+    }
+
+    // TODO: if searching, display a search bar instead
     VerticalLayout {
 
         ScrollView {
@@ -24,7 +30,7 @@ export component Explorer inherits Window {
             }
         }
 
-        LazyList {
+        lazy := LazyList {
             items: items;
             remaining: remaining;
             refresh(offset, limit) => refresh(offset, limit);

@@ -15,6 +15,11 @@ export component LazyList {
     changed offset => refresh(offset, limit);
     changed limit => refresh(offset, limit);
 
+    // Reset scroll (call this after navigating)
+    public function reset-scroll() {
+        scroll.viewport-y = 0;
+    }
+
     scroll := ScrollView {
         ta := TouchArea {
             pointer-event(event) => {
