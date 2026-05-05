@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Model, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
+use slint::{Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
 
 use crate::items::{ItemKey, Items};
 use crate::ui::{self, Explorer};
@@ -105,9 +105,16 @@ impl State {
                 self.update_ui();
             }
             Message::ThumbnailLoaded { key, buffer } => {
+                let cloned = buffer.clone();
                 self.items.set_thumbnail(key, buffer);
-                // TODO: update inner image, and iterate over displayed images
-                // on the UI thread in order to potentially update in place the thumbnail
+
+                self.explorer
+                    .upgrade_in_event_loop(move |explorer| {
+                        update_item(&explorer, key, move |item| {
+                            item.icon = Image::from_rgba8(cloned)
+                        });
+                    })
+                    .unwrap();
             }
         }
     }
@@ -115,4 +122,30 @@ impl State {
 
 fn downcast_vec<T: 'static>(model: &ModelRc<T>) -> &VecModel<T> {
     model.as_any().downcast_ref::<VecModel<T>>().unwrap()
+}
+/// Update an item by key
+fn update_item<F>(explorer: &Explorer, key: ItemKey, update: F)
+where
+    F: FnOnce(&mut ui::Item),
+{
+    let key: ui::ItemKey = key.into();
+    let items = explorer.get_items();
+    let downcasted = downcast_vec(&items);
+    if let Some(idx) = downcasted
+        .iter()
+        .enumerate()
+        .filter_map(|(i, item)| {
+            if item.key == key {
+                return Some(i);
+            } else {
+                None
+            }
+        })
+        .next()
+        && let Some(row) = downcasted.row_data(idx)
+    {
+        let mut row = row.clone();
+        update(&mut row);
+        downcasted.set_row_data(idx, row);
+    }
 }
