@@ -7,7 +7,6 @@ use crate::state::{Message, State};
 mod config;
 mod icons;
 mod items;
-mod search;
 mod sort;
 mod state;
 mod thumbnails;
