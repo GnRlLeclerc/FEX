@@ -12,6 +12,7 @@ component SearchComponent {
     in-out property <State> state;
     in-out property <bool> focus-on-init: true;
     property <bool> has-focus: line.has-focus;
+    callback search(text: string);
 
     init => {
         // https://github.com/slint-ui/slint/issues/7617
@@ -36,7 +37,11 @@ component SearchComponent {
         }
     }
 
-    line := LineEdit { }
+    line := LineEdit {
+        edited(text) => {
+            search(text);
+        }
+    }
 }
 
 export component Explorer inherits Window {
@@ -57,6 +62,7 @@ export component Explorer inherits Window {
     callback open(key: ItemKey);
     callback navigate(count: int); // navigate to the i-th cwd component
     callback refresh(offset: int, limit: int);
+    callback search(text: string);
 
     // Reset scroll (call this after navigating)
     public function reset-scroll() {
@@ -96,6 +102,7 @@ export component Explorer inherits Window {
             }
 
             if state != State.browsing: SearchComponent {
+                search(text) => search(text);
                 state <=> root.state;
             }
 

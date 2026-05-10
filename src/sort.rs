@@ -2,7 +2,9 @@
 
 use std::cmp::Ordering;
 
-use crate::items::{Item, Metadata};
+use slotmap::SlotMap;
+
+use crate::items::{Item, ItemKey, Metadata};
 
 #[derive(Default, Eq, PartialEq)]
 pub enum SortBy {
@@ -47,5 +49,22 @@ impl Sort {
             SortOrder::Ascending => ordering,
             SortOrder::Descending => ordering.reverse(),
         }
+    }
+
+    /// Sort a vector of keys backed by a slotmap
+    pub fn sort(&self, slice: &mut [ItemKey], items: &SlotMap<ItemKey, Item>) {
+        slice.sort_by(|a, b| {
+            let item_a = &items[*a];
+            let item_b = &items[*b];
+            self.compare(item_a, item_b)
+        });
+    }
+
+    /// Insert a key in a vector backed by a slotmap, keeping it sorted
+    pub fn insert(&self, item: &Item, vec: &mut Vec<ItemKey>, items: &SlotMap<ItemKey, Item>) {
+        let index = vec
+            .binary_search_by(|key| self.compare(&item, &items[*key]))
+            .unwrap_or_else(|e| e);
+        vec.insert(index, item.key);
     }
 }

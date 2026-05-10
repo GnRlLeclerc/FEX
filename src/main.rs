@@ -7,6 +7,7 @@ use crate::state::{Message, State};
 mod config;
 mod icons;
 mod items;
+mod search;
 mod sort;
 mod state;
 mod thumbnails;
@@ -40,6 +41,11 @@ fn main() {
             subcomponent: subcomponent as usize,
         })
         .unwrap();
+    });
+
+    let txc = tx.clone();
+    explorer.on_search(move |text| {
+        txc.send(Message::Search { text }).unwrap();
     });
 
     let _ = thread::spawn(move || {

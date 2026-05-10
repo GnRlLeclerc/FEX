@@ -12,6 +12,7 @@ mime = "0.3.17"
 rayon = "1.12.0"
 slint = "1.16.1"
 slotmap = "1.1.1"
+unidecode = "0.3.0"
 xdg-mime = "0.4.0"
 
 [build-dependencies]

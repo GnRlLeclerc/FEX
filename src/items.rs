@@ -9,6 +9,7 @@ use mime::Mime;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
+use unidecode::unidecode;
 
 use crate::{
     icons::Icons,
@@ -56,29 +57,38 @@ pub struct Item {
     pub key: ItemKey,
     path: PathBuf,
     selected: bool,
+    normalized_name: String,
     pub name: SharedString,
     pub metadata: Metadata,
     pub icon: Icon,
 }
 
+/// File explorer items.
+///
+/// Items are stored in a slotmap.
+/// Uses pre-sorted and pre-filtered vectors for efficiency.
 pub struct Items {
     sort: Sort,
+    sorted: Vec<ItemKey>,
+    filter: Option<Vec<String>>,
+    filtered: Option<Vec<ItemKey>>,
     icons: Icons,
     items: SlotMap<ItemKey, Item>,
     by_path: HashMap<PathBuf, ItemKey>,
     selected: HashSet<ItemKey>,
-    ordered: Vec<ItemKey>,
 }
 
 impl Items {
     pub fn new() -> Self {
         Self {
             sort: Sort::default(),
+            sorted: Vec::new(),
+            filter: None,
+            filtered: None,
             icons: Icons::new("Papirus".into()),
             items: SlotMap::with_key(),
             by_path: HashMap::new(),
             selected: HashSet::new(),
-            ordered: Vec::new(),
         }
     }
 
@@ -102,7 +112,17 @@ impl Items {
     }
 
     pub fn select_all(&mut self) {
-        self.selected = self.items.keys().collect();
+        self.selected = self
+            .filtered
+            .as_ref()
+            .unwrap_or(&self.sorted)
+            .iter()
+            .cloned()
+            .collect();
+
+        for key in &self.selected {
+            self.items[*key].selected = true;
+        }
     }
 
     pub fn unselect_all(&mut self) {
@@ -113,9 +133,11 @@ impl Items {
     }
 
     /// Get a slice of items ready to be sent to the UI
-    pub fn slice(&mut self, offset: usize, limit: usize) -> Vec<ItemData> {
-        self.ordered
-            .iter_mut()
+    pub fn slice(&self, offset: usize, limit: usize) -> Vec<ItemData> {
+        self.filtered
+            .as_ref()
+            .unwrap_or(&self.sorted)
+            .iter()
             .skip(offset)
             .take(limit)
             .map(|key| (&self.items[*key]).into())
@@ -126,41 +148,68 @@ impl Items {
         if let Some(item) = self.items.remove(key) {
             self.by_path.remove(&item.path);
             self.selected.remove(&key);
-            self.ordered.retain(|k| *k != key);
+            self.sorted.retain(|k| *k != key);
+            if let Some(filtered) = &mut self.filtered {
+                filtered.retain(|k| *k != key);
+            }
         }
     }
 
-    pub fn add(&mut self, item: Item) {
+    pub fn insert(&mut self, item: Item) {
         let key = self.items.insert(item);
         self.items[key].key = key;
         let item = &self.items[key];
         self.by_path.insert(item.path.clone(), key);
-
-        let index = self
-            .ordered
-            .binary_search_by(|key| self.sort.compare(&item, &self.items[*key]))
-            .unwrap_or_else(|e| e);
-        self.ordered.insert(index, key);
+        self.sort.insert(item, &mut self.sorted, &self.items);
+        if let Some(filtered) = &mut self.filtered {
+            self.sort.insert(item, filtered, &self.items);
+        }
     }
 
     pub fn reset(&mut self) {
         self.items.clear();
         self.by_path.clear();
         self.selected.clear();
-        self.ordered.clear();
+        self.sorted.clear();
+        if let Some(filtered) = &mut self.filtered {
+            filtered.clear();
+        }
+    }
+
+    pub fn search(&mut self, search: Option<&str>) {
+        self.filter = search.map(|s| {
+            s.split_whitespace()
+                .map(str::to_lowercase)
+                .map(|s| unidecode(&s))
+                .collect::<Vec<_>>()
+        });
+        self.filter();
     }
 
     pub fn sort(&mut self, sort: Sort) {
-        if self.sort == sort {
-            return;
-        }
-
         self.sort = sort;
-        self.ordered.sort_by(|a, b| {
-            let item_a = &self.items[*a];
-            let item_b = &self.items[*b];
-            self.sort.compare(item_a, item_b)
-        });
+        // 1. Sort
+        self.sort.sort(&mut self.sorted, &self.items);
+        // 2. Filter
+        self.filter();
+    }
+
+    /// Update the precomputed filtered vector from the filter params,
+    /// using the pre-sorted vector.
+    fn filter(&mut self) {
+        if let Some(filter) = &self.filter {
+            self.filtered = Some(
+                self.sorted
+                    .iter()
+                    .filter(|&key| {
+                        filter
+                            .iter()
+                            .all(|s| self.items[*key].normalized_name.contains(s))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            );
+        }
     }
 
     pub fn load(&mut self, path: &Path) {
@@ -192,7 +241,7 @@ impl Items {
             self.items[key].key = key;
             let item = &mut self.items[key];
             self.by_path.insert(item.path.clone(), key);
-            self.ordered.push(key);
+            self.sorted.push(key);
         });
     }
 }
@@ -225,6 +274,7 @@ fn process_entry(entry: &DirEntry, icons: &Icons) -> Option<Item> {
 
     Some(Item {
         key: ItemKey::null(),
+        normalized_name: unidecode(&name.to_lowercase()),
         name,
         path: entry.path(),
         selected: false,

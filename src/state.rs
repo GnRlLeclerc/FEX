@@ -17,15 +17,25 @@ pub struct State {
 
 pub enum Message {
     /// UI scroll changed enough to display different elements
-    RefreshSlice { offset: usize, limit: usize },
+    RefreshSlice {
+        offset: usize,
+        limit: usize,
+    },
     /// Item clicked
-    Open { key: ui::ItemKey },
+    Open {
+        key: ui::ItemKey,
+    },
     /// Navigate to path subcomponent
-    Navigate { subcomponent: usize },
+    Navigate {
+        subcomponent: usize,
+    },
     /// Thumbnail loaded for an image
     ThumbnailLoaded {
         key: ItemKey,
         buffer: SharedPixelBuffer<Rgba8Pixel>,
+    },
+    Search {
+        text: SharedString,
     },
 }
 
@@ -115,6 +125,15 @@ impl State {
                         });
                     })
                     .unwrap();
+            }
+            Message::Search { text } => {
+                let search = match text.is_empty() {
+                    false => Some(text.as_str()),
+                    true => None,
+                };
+
+                self.items.search(search);
+                self.update_ui();
             }
         }
     }
