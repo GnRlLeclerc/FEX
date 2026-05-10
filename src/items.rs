@@ -93,6 +93,9 @@ impl Items {
     }
 
     pub fn len(&self) -> usize {
+        if let Some(filtered) = &self.filtered {
+            return filtered.len();
+        }
         self.items.len()
     }
 

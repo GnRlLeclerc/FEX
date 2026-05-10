@@ -102,7 +102,10 @@ export component Explorer inherits Window {
             }
 
             if state != State.browsing: SearchComponent {
-                search(text) => search(text);
+                search(text) => {
+                    search(text);
+                    reset-scroll();
+                }
                 state <=> root.state;
             }
 
