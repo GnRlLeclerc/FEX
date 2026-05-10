@@ -1,12 +1,58 @@
-import { Button, ScrollView } from "std-widgets.slint";
+import { Button, ScrollView, LineEdit } from "std-widgets.slint";
 import { Item, ItemKey } from "./items.slint";
 import { LazyList } from "./lazylist.slint";
 
+enum State {
+    searching, // typing while in search mode
+    inspecting, // inspecting search results
+    browsing, // not in search mode
+}
+
+component SearchComponent {
+    in-out property <State> state;
+    in-out property <bool> focus-on-init: true;
+    property <bool> has-focus: line.has-focus;
+
+    init => {
+        // https://github.com/slint-ui/slint/issues/7617
+        // line.focus();
+    }
+
+    // Sync focus -> state
+    changed has-focus => {
+        if has-focus {
+            state = State.searching;
+        } else {
+            state = State.inspecting;
+        }
+    }
+
+    // Sync state -> focus
+    changed state => {
+        if state == State.searching {
+            line.focus()
+        } else {
+            line.clear-focus()
+        }
+    }
+
+    line := LineEdit { }
+}
 
 export component Explorer inherits Window {
+    forward-focus: scope;
+
     in property <[Item]> items;
     in property <[string]> cwd: ["aaa", "bbb", "ccc"];
     in property <int> remaining: 0;
+    property <State> state: browsing;
+
+    // Properly reset focus to the root scope on search exit
+    changed state => {
+        if state != State.searching {
+            scope.focus();
+        }
+    }
 
     callback open(key: ItemKey);
     callback navigate(count: int); // navigate to the i-th cwd component
@@ -17,24 +63,48 @@ export component Explorer inherits Window {
         lazy.reset-scroll();
     }
 
-    // TODO: if searching, display a search bar instead
-    VerticalLayout {
+    scope := FocusScope {
+        KeyBinding {
+            keys: @keys(Slash);
+            activated => {
+                if state != State.searching {
+                    state = State.searching;
+                }
+            };
+        }
 
-        ScrollView {
-            height: 50px;
-            HorizontalLayout {
-                for item[index] in cwd: Button {
-                    text: item;
-                    clicked => navigate(index);
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                if state == State.searching {
+                    state = State.inspecting;
+                } else if state == State.inspecting {
+                    state = State.browsing;
                 }
             }
         }
 
-        lazy := LazyList {
-            items: items;
-            remaining: remaining;
-            refresh(offset, limit) => refresh(offset, limit);
-            open(key) => open(key);
+        VerticalLayout {
+            if state == State.browsing: ScrollView {
+                height: 50px;
+                HorizontalLayout {
+                    for item[index] in cwd: Button {
+                        text: item;
+                        clicked => navigate(index);
+                    }
+                }
+            }
+
+            if state != State.browsing: SearchComponent {
+                state <=> root.state;
+            }
+
+            lazy := LazyList {
+                items: items;
+                remaining: remaining;
+                refresh(offset, limit) => refresh(offset, limit);
+                open(key) => open(key);
+            }
         }
     }
 }
