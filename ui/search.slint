@@ -1,0 +1,45 @@
+// Top bar filtering search
+
+import { LineEdit } from "std-widgets.slint";
+
+export enum SearchState {
+    searching, // typing while in search mode
+    inspecting, // inspecting search results
+    browsing, // not in search mode
+}
+
+export component Search {
+    in-out property <SearchState> state;
+    in-out property <bool> focus-on-init: true;
+    property <bool> has-focus: line.has-focus;
+    callback search(text: string);
+
+    init => {
+        // https://github.com/slint-ui/slint/issues/7617
+        // line.focus();
+    }
+
+    // Sync focus -> state
+    changed has-focus => {
+        if has-focus {
+            state = SearchState.searching;
+        } else {
+            state = SearchState.inspecting;
+        }
+    }
+
+    // Sync state -> focus
+    changed state => {
+        if state == SearchState.searching {
+            line.focus()
+        } else {
+            line.clear-focus()
+        }
+    }
+
+    line := LineEdit {
+        edited(text) => {
+            search(text);
+        }
+    }
+}

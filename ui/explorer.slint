@@ -1,48 +1,8 @@
 import { Button, ScrollView, LineEdit } from "std-widgets.slint";
 import { Item, ItemKey } from "./items.slint";
 import { LazyList } from "./lazylist.slint";
+import { Search, SearchState } from "./search.slint";
 
-enum State {
-    searching, // typing while in search mode
-    inspecting, // inspecting search results
-    browsing, // not in search mode
-}
-
-component SearchComponent {
-    in-out property <State> state;
-    in-out property <bool> focus-on-init: true;
-    property <bool> has-focus: line.has-focus;
-    callback search(text: string);
-
-    init => {
-        // https://github.com/slint-ui/slint/issues/7617
-        // line.focus();
-    }
-
-    // Sync focus -> state
-    changed has-focus => {
-        if has-focus {
-            state = State.searching;
-        } else {
-            state = State.inspecting;
-        }
-    }
-
-    // Sync state -> focus
-    changed state => {
-        if state == State.searching {
-            line.focus()
-        } else {
-            line.clear-focus()
-        }
-    }
-
-    line := LineEdit {
-        edited(text) => {
-            search(text);
-        }
-    }
-}
 
 export component Explorer inherits Window {
     forward-focus: scope;
@@ -50,11 +10,11 @@ export component Explorer inherits Window {
     in property <[Item]> items;
     in property <[string]> cwd: ["aaa", "bbb", "ccc"];
     in property <int> remaining: 0;
-    property <State> state: browsing;
+    property <SearchState> state: browsing;
 
     // Properly reset focus to the root scope on search exit
     changed state => {
-        if state != State.searching {
+        if state != SearchState.searching {
             scope.focus();
         }
     }
@@ -73,8 +33,8 @@ export component Explorer inherits Window {
         KeyBinding {
             keys: @keys(Slash);
             activated => {
-                if state != State.searching {
-                    state = State.searching;
+                if state != SearchState.searching {
+                    state = SearchState.searching;
                 }
             };
         }
@@ -82,16 +42,19 @@ export component Explorer inherits Window {
         KeyBinding {
             keys: @keys(Escape);
             activated => {
-                if state == State.searching {
-                    state = State.inspecting;
-                } else if state == State.inspecting {
-                    state = State.browsing;
+                if state == SearchState.searching {
+                    state = SearchState.inspecting;
+                } else if state == SearchState.inspecting {
+                    state = SearchState.browsing;
+                    search("");
+                } else if state == SearchState.browsing {
+                   // TODO: reset selection
                 }
             }
         }
 
         VerticalLayout {
-            if state == State.browsing: ScrollView {
+            if state == SearchState.browsing: ScrollView {
                 height: 50px;
                 HorizontalLayout {
                     for item[index] in cwd: Button {
@@ -101,7 +64,7 @@ export component Explorer inherits Window {
                 }
             }
 
-            if state != State.browsing: SearchComponent {
+            if state != SearchState.browsing: Search {
                 search(text) => {
                     search(text);
                     reset-scroll();
