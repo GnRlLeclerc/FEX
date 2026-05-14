@@ -21,7 +21,7 @@ fn main() {
     let (mut state, tx) = State::new(weak);
 
     let txc = tx.clone();
-    explorer.on_refresh(move |offset, limit| {
+    explorer.on_refresh_entries(move |offset, limit| {
         txc.send(Message::RefreshSlice {
             offset: offset as usize,
             limit: limit as usize,

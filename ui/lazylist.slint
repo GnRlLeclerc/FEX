@@ -4,16 +4,26 @@ import { ScrollView } from "std-widgets.slint";
 export component LazyList {
     in property <[Item]> items;
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
-    callback refresh(offset: int, limit: int);
+    callback refresh-entries(offset: int, limit: int);
     callback open(key: ItemKey);
 
-    out property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
-    out property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
-    out property <{x: length, y: length}> select;
-    out property <bool> selecting: false;
+    property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
+    property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
+    property <{ x: length, y: length}> select;
+    property <bool> selecting: false;
 
-    changed offset => refresh(offset, limit);
-    changed limit => refresh(offset, limit);
+    property <length> list-padding-top;
+    property <length> list-padding-bot;
+
+    // Refresh both entries and top padding rectangle at the same time
+    // in order to avoid flickering when scrolling at high speed
+    function refresh() {
+        refresh-entries(offset, limit);
+        list-padding-top = offset * 110px;
+    }
+
+    changed offset => refresh();
+    changed limit => refresh();
 
     // Reset scroll (call this after navigating)
     public function reset-scroll() {
@@ -38,7 +48,7 @@ export component LazyList {
 
             // Virtual padding for elements scrolled out of view
             Rectangle {
-                height: offset * 110px;
+                height: list-padding-top;
             }
 
             for item[index] in items: ItemView {
