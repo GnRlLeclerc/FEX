@@ -1,5 +1,6 @@
 import { Item, ItemView, ItemKey } from "./items.slint";
 import { ScrollView } from "std-widgets.slint";
+import { Config } from "config.slint";
 
 export component LazyList {
     in property <[Item]> items;
@@ -30,15 +31,39 @@ export component LazyList {
         scroll.viewport-y = 0;
     }
 
+    // Scroll on select when the cursor is near the top / bottom
+    timer := Timer {
+        interval: Config.scroll-tick;
+        running: selecting;
+        triggered() => {
+            let range = Config.scroll-range;
+            let top = scroll.y - scroll.viewport-y + range;
+            let bottom = scroll.y + scroll.visible-height - scroll.viewport-y - range;
+
+            // Check proximity to bottom
+            if ta.mouse-y > bottom {
+                let speed = min((ta.mouse-y - bottom) / range, 1);
+                let delta = speed * speed * Config.scroll-max-delta;
+                scroll.viewport-y -= delta;
+            // Check proximity to top
+            } else if ta.mouse-y < top {
+                let speed = min((top - ta.mouse-y) / range, 1);
+                let delta = speed * speed * Config.scroll-max-delta;
+                scroll.viewport-y += min(delta, -scroll.viewport-y);
+            }
+        }
+    }
+
     scroll := ScrollView {
         ta := TouchArea {
             pointer-event(event) => {
                 if event.kind == PointerEventKind.down {
                     selecting = true;
                     select = { x: ta.mouse-x, y: ta.mouse-y };
-                }
-                if event.kind == PointerEventKind.up {
+                } else if event.kind == PointerEventKind.up {
                     selecting = false;
+                } else if event.kind == PointerEventKind.move && selecting {
+                    // TODO: collision check for selection
                 }
             }
         }
