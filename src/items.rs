@@ -200,8 +200,8 @@ impl Items {
     /// Update the precomputed filtered vector from the filter params,
     /// using the pre-sorted vector.
     fn filter(&mut self) {
-        if let Some(filter) = &self.filter {
-            self.filtered = Some(
+        self.filtered = match &self.filter {
+            Some(filter) => Some(
                 self.sorted
                     .iter()
                     .filter(|&key| {
@@ -211,8 +211,9 @@ impl Items {
                     })
                     .cloned()
                     .collect::<Vec<_>>(),
-            );
-        }
+            ),
+            None => None,
+        };
     }
 
     pub fn load(&mut self, path: &Path) {
