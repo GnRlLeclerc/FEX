@@ -1,7 +1,7 @@
 //! Loading file icons and image thumbnails
 
 use mime::Mime;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use xdg_mime::SharedMimeInfo;
 
 use freedesktop_icons::lookup;
@@ -12,6 +12,7 @@ pub struct Icons {
     theme: String,
     size: u16,
     folder: PathBuf,
+    cache: HashMap<Vec<Mime>, PathBuf>,
 }
 
 impl Icons {
@@ -30,6 +31,7 @@ impl Icons {
             theme,
             size,
             folder,
+            cache: HashMap::new(),
         }
     }
 
@@ -43,7 +45,17 @@ impl Icons {
     }
 
     /// Get the icon path for a file
-    pub fn get_icon(&self, mimes: &[Mime]) -> PathBuf {
+    pub fn get_icon(&mut self, mimes: &[Mime]) -> PathBuf {
+        if let Some(icon) = self.cache.get(mimes) {
+            return icon.clone();
+        }
+
+        let icon = self.get_icon_no_cache(mimes);
+        self.cache.insert(mimes.into(), icon.clone());
+        return icon;
+    }
+
+    fn get_icon_no_cache(&self, mimes: &[Mime]) -> PathBuf {
         // 1. Look for matching icons
         for mime in mimes {
             let icons = self.db.lookup_icon_names(mime);

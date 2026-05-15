@@ -6,7 +6,6 @@ use std::{
 };
 
 use mime::Mime;
-use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
 use slotmap::{Key, KeyData, SlotMap, new_key_type};
 use unidecode::unidecode;
@@ -217,23 +216,18 @@ impl Items {
     }
 
     pub fn load(&mut self, path: &Path) {
-        // 1. Collect entries to be processed
-        let entries = fs::read_dir(path).unwrap().collect::<Vec<_>>();
+        let read_dir = match fs::read_dir(path) {
+            Ok(read_dir) => read_dir,
+            Err(err) => {
+                log::error!("Could not load folder {:?}: {}", path, err);
+                return;
+            }
+        };
 
-        // 2. Process entries in parallel and collect them
-        let mut items = entries
-            .par_chunks(10_000)
-            .flat_map(|chunk| {
-                chunk
-                    .into_iter()
-                    .filter_map(|entry| {
-                        entry
-                            .as_ref()
-                            .ok()
-                            .and_then(|e| process_entry(e, &self.icons))
-                    })
-                    .collect::<Vec<_>>()
-            })
+        // Collect items
+        let mut items = read_dir
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| process_entry(&entry, &mut self.icons))
             .collect::<Vec<_>>();
 
         // Sort items
@@ -250,7 +244,7 @@ impl Items {
     }
 }
 
-fn process_entry(entry: &DirEntry, icons: &Icons) -> Option<Item> {
+fn process_entry(entry: &DirEntry, icons: &mut Icons) -> Option<Item> {
     let name: SharedString = entry.file_name().to_string_lossy().to_string().into();
     let meta = fs::metadata(entry.path()).ok()?;
 
