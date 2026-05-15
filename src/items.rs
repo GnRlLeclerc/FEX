@@ -57,7 +57,7 @@ pub struct Item {
     pub key: ItemKey,
     path: PathBuf,
     selected: bool,
-    normalized_name: String,
+    pub normalized_name: String,
     pub name: SharedString,
     pub metadata: Metadata,
     pub icon: Icon,
