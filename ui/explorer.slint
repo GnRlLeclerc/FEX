@@ -59,7 +59,10 @@ export component Explorer inherits Window {
                 HorizontalLayout {
                     for item[index] in cwd: Button {
                         text: item;
-                        clicked => navigate(index);
+                        clicked => {
+                            navigate(index);
+                            lazy.reset-scroll();
+                        };
                     }
                 }
             }
