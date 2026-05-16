@@ -48,8 +48,10 @@ impl Thumbnails {
                                 image.height(),
                             );
 
-                            if let Err(err) = self.tx.send(Message::ThumbnailLoaded { key, buffer })
-                            {
+                            if let Err(err) = self.tx.send(Message::ThumbnailLoaded {
+                                key: key.into(),
+                                buffer,
+                            }) {
                                 log::error!("Failed to send loaded thumbnail: {:?}", err);
                             }
                         }
