@@ -12,7 +12,8 @@ export struct Item {
 }
 
 export component ItemView inherits Rectangle {
-    in property <Item> item;
+    in-out property <Item> item;
+    callback select(key: ItemKey);
     callback open(key: ItemKey);
 
     background: ta.has-hover ? red : item.selected ? grey : transparent;
@@ -21,7 +22,11 @@ export component ItemView inherits Rectangle {
     border-radius: 15px;
 
     ta := TouchArea {
-        clicked => open(item.key);
+        clicked => {
+            select(item.key);
+            item.selected = true;
+        };
+        double-clicked => open(item.key);
     }
 
     HorizontalLayout {

@@ -21,8 +21,12 @@ pub enum Message {
         offset: usize,
         limit: usize,
     },
-    /// Item clicked
+    /// Item double clicked
     Open {
+        key: ui::ItemKey,
+    },
+    /// Item clicked
+    Select {
         key: ui::ItemKey,
     },
     /// Navigate to path subcomponent
@@ -37,6 +41,8 @@ pub enum Message {
     Search {
         text: SharedString,
     },
+    SelectAll,
+    UnselectAll,
 }
 
 impl State {
@@ -107,6 +113,9 @@ impl State {
                     self.update_ui();
                 }
             }
+            Message::Select { key } => {
+                self.items.select(key.into());
+            }
             Message::Navigate { subcomponent } => {
                 self.cwd = self.cwd.components().take(subcomponent + 1).collect();
                 self.items.reset();
@@ -134,6 +143,12 @@ impl State {
 
                 self.items.search(search);
                 self.update_ui();
+            }
+            Message::SelectAll => {
+                self.items.select_all();
+            }
+            Message::UnselectAll => {
+                self.items.unselect_all();
             }
         }
     }

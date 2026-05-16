@@ -55,7 +55,7 @@ pub enum Icon {
 pub struct Item {
     pub key: ItemKey,
     path: PathBuf,
-    selected: bool,
+    pub selected: bool,
     pub normalized_name: String,
     pub name: SharedString,
     pub metadata: Metadata,
@@ -111,6 +111,11 @@ impl Items {
 
     pub fn set_thumbnail(&mut self, key: ItemKey, buffer: SharedPixelBuffer<Rgba8Pixel>) {
         self.items[key].icon = Icon::Thumbnail(buffer);
+    }
+
+    pub fn select(&mut self, key: ItemKey) {
+        self.selected.insert(key);
+        self.items[key].selected = true;
     }
 
     pub fn select_all(&mut self) {

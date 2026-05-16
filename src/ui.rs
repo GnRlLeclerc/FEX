@@ -23,6 +23,7 @@ pub struct ItemData {
     name: SharedString,
     folder: bool,
     icon: Icon,
+    selected: bool,
 }
 
 impl From<&items::Item> for ItemData {
@@ -32,6 +33,7 @@ impl From<&items::Item> for ItemData {
             name: item.name.clone(),
             folder: item.metadata.is_folder(),
             icon: item.icon.clone(),
+            selected: item.selected,
         }
     }
 }
@@ -41,8 +43,8 @@ impl From<ItemData> for Item {
         Self {
             key: item.key.into(),
             name: item.name,
-            selected: false,
             icon: item.icon.into(),
+            selected: item.selected,
         }
     }
 }

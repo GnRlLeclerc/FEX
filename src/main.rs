@@ -47,6 +47,20 @@ fn main() {
         txc.send(Message::Search { text }).unwrap();
     });
 
+    let txc = tx.clone();
+    explorer.on_select(move |key| {
+        txc.send(Message::Select { key }).unwrap();
+    });
+
+    let txc = tx.clone();
+    explorer.on_select_all(move |select| {
+        txc.send(match select {
+            true => Message::SelectAll,
+            false => Message::UnselectAll,
+        })
+        .unwrap();
+    });
+
     let _ = thread::spawn(move || {
         state.event_loop();
     });

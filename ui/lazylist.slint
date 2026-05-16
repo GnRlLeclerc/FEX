@@ -7,10 +7,11 @@ export component LazyList {
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
     callback refresh-entries(offset: int, limit: int);
     callback open(key: ItemKey);
+    callback select(key: ItemKey);
 
     property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
     property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
-    property <{ x: length, y: length}> select;
+    property <{ x: length, y: length}> anchor;
     property <{ x: length, y: length}> cursor;
     property <bool> selecting: false;
     property <length> list-padding-top;
@@ -62,8 +63,8 @@ export component LazyList {
             pointer-event(event) => {
                 if event.kind == PointerEventKind.down {
                     selecting = true;
-                    select = { x: ta.mouse-x, y: ta.mouse-y };
-                    cursor = select;
+                    anchor = { x: ta.mouse-x, y: ta.mouse-y };
+                    cursor = anchor;
                 } else if event.kind == PointerEventKind.up {
                     selecting = false;
                 } else if event.kind == PointerEventKind.move && selecting {
@@ -83,6 +84,7 @@ export component LazyList {
             for item[index] in items: ItemView {
                 item: item;
                 open(key) => open(key);
+                select(key) => select(key);
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
@@ -99,11 +101,11 @@ export component LazyList {
             border-width: 2px;
             border-radius: 5px;
 
-            x: Math.min(select.x, cursor.x);
-            y: Math.min(select.y, cursor.y);
+            x: Math.min(anchor.x, cursor.x);
+            y: Math.min(anchor.y, cursor.y);
 
-            width: Math.abs(cursor.x - select.x);
-            height: Math.abs(cursor.y - select.y);
+            width: Math.abs(cursor.x - anchor.x);
+            height: Math.abs(cursor.y - anchor.y);
         }
     }
 }
