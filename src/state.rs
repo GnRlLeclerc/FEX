@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel, Weak};
+use slint::{Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString, Weak};
 
 use crate::items::{ItemKey, Items};
-use crate::ui::{self, Explorer};
+use crate::ui::{self, Explorer, downcast_vec, update_items};
 
 pub struct State {
     recv: Receiver<Message>,
@@ -118,10 +118,26 @@ impl State {
             Message::Select { key, exclusive } => {
                 if exclusive {
                     self.items.unselect_all();
-                    self.items.select(key.into());
-                    self.update_ui();
+                    self.items.select(key.clone().into());
+                    let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
+                        update_items(
+                            &explorer.get_items(),
+                            |item| {
+                                (item.key == key && !item.selected)
+                                    || (item.key != key && item.selected)
+                            },
+                            |item| item.selected = item.key == key,
+                        );
+                    });
                 } else {
-                    self.items.select(key.into());
+                    self.items.select(key.clone().into());
+                    let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
+                        update_items(
+                            &explorer.get_items(),
+                            |item| item.key == key,
+                            |item| item.selected = true,
+                        );
+                    });
                 }
             }
             Message::Navigate { subcomponent } => {
@@ -154,19 +170,24 @@ impl State {
             }
             Message::SelectAll => {
                 self.items.select_all();
-                self.update_ui();
+                let _ = self.explorer.upgrade_in_event_loop(|explorer| {
+                    update_items(&explorer.get_items(), |_| true, |item| item.selected = true);
+                });
             }
             Message::UnselectAll => {
                 self.items.unselect_all();
-                self.update_ui();
+                let _ = self.explorer.upgrade_in_event_loop(|explorer| {
+                    update_items(
+                        &explorer.get_items(),
+                        |_| true,
+                        |item| item.selected = false,
+                    );
+                });
             }
         }
     }
 }
 
-fn downcast_vec<T: 'static>(model: &ModelRc<T>) -> &VecModel<T> {
-    model.as_any().downcast_ref::<VecModel<T>>().unwrap()
-}
 /// Update an item by key
 fn update_item<F>(explorer: &Explorer, key: ItemKey, update: F)
 where

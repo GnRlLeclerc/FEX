@@ -21,13 +21,18 @@ export component ItemView inherits Rectangle {
     height: 100px;
     border-radius: 15px;
 
+    property <bool> ctrl: false;
+    property <bool> shift: false;
+
     ta := TouchArea {
+
+        // Use pointer event to keep track of modifiers.
         pointer-event(event) => {
-            if event.button == PointerEventButton.left {
-                select(item.key, !event.modifiers.control);
-                item.selected = true;
-            }
+            ctrl = event.modifiers.control;
+            shift = event.modifiers.shift;
         }
+
+        clicked => select(item.key, !ctrl);
         double-clicked => open(item.key);
     }
 

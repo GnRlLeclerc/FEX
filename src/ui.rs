@@ -1,9 +1,33 @@
-use slint::{Image, SharedString};
+use slint::{Image, Model, ModelRc, SharedString, VecModel};
 use slotmap::{Key, KeyData};
 
 use crate::items::{self, Icon};
 
 slint::include_modules!();
+
+pub fn downcast_vec<T: 'static>(model: &ModelRc<T>) -> &VecModel<T> {
+    model.as_any().downcast_ref::<VecModel<T>>().unwrap()
+}
+
+/// Update items in a model in place
+pub fn update_items<T, F, U>(model: &ModelRc<T>, filter: F, update: U)
+where
+    T: Clone + 'static,
+    F: Fn(&T) -> bool,
+    U: Fn(&mut T),
+{
+    let model = downcast_vec(model);
+
+    for i in 0..model.row_count() {
+        if let Some(mut row) = model.row_data(i) {
+            if !filter(&row) {
+                continue;
+            }
+            update(&mut row);
+            model.set_row_data(i, row);
+        }
+    }
+}
 
 /// Item data is passed from the background thread to the UI thread
 /// by copy, because slint's upgrade_in_event_loop runs a non-blocking
