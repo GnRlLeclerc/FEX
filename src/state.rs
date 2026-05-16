@@ -146,9 +146,11 @@ impl State {
             }
             Message::SelectAll => {
                 self.items.select_all();
+                self.update_ui();
             }
             Message::UnselectAll => {
                 self.items.unselect_all();
+                self.update_ui();
             }
         }
     }
