@@ -48,8 +48,8 @@ fn main() {
     });
 
     let txc = tx.clone();
-    explorer.on_select(move |key| {
-        txc.send(Message::Select { key }).unwrap();
+    explorer.on_select(move |key, exclusive| {
+        txc.send(Message::Select { key, exclusive }).unwrap();
     });
 
     let txc = tx.clone();

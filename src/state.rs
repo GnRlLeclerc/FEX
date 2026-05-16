@@ -27,6 +27,8 @@ pub enum Message {
     },
     /// Item clicked
     Select {
+        /// Whether to unselect all other items
+        exclusive: bool,
         key: ui::ItemKey,
     },
     /// Navigate to path subcomponent
@@ -113,8 +115,14 @@ impl State {
                     self.update_ui();
                 }
             }
-            Message::Select { key } => {
-                self.items.select(key.into());
+            Message::Select { key, exclusive } => {
+                if exclusive {
+                    self.items.unselect_all();
+                    self.items.select(key.into());
+                    self.update_ui();
+                } else {
+                    self.items.select(key.into());
+                }
             }
             Message::Navigate { subcomponent } => {
                 self.cwd = self.cwd.components().take(subcomponent + 1).collect();

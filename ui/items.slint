@@ -13,7 +13,7 @@ export struct Item {
 
 export component ItemView inherits Rectangle {
     in-out property <Item> item;
-    callback select(key: ItemKey);
+    callback select(key: ItemKey, exclusive: bool);
     callback open(key: ItemKey);
 
     background: ta.has-hover ? red : item.selected ? grey : transparent;
@@ -22,10 +22,12 @@ export component ItemView inherits Rectangle {
     border-radius: 15px;
 
     ta := TouchArea {
-        clicked => {
-            select(item.key);
-            item.selected = true;
-        };
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left {
+                select(item.key, !event.modifiers.control);
+                item.selected = true;
+            }
+        }
         double-clicked => open(item.key);
     }
 

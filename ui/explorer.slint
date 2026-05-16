@@ -20,7 +20,7 @@ export component Explorer inherits Window {
     }
 
     callback open(key: ItemKey);
-    callback select(key: ItemKey);
+    callback select(key: ItemKey, exclusive: bool);
     callback navigate(count: int); // navigate to the i-th cwd component
     callback refresh-entries(offset: int, limit: int);
     callback search(text: string);
@@ -89,7 +89,7 @@ export component Explorer inherits Window {
                 remaining: remaining;
                 refresh-entries(offset, limit) => refresh-entries(offset, limit);
                 open(key) => open(key);
-                select(key) => select(key);
+                select(key, exclusive) => select(key, exclusive);
             }
         }
     }

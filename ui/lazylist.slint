@@ -7,7 +7,7 @@ export component LazyList {
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
     callback refresh-entries(offset: int, limit: int);
     callback open(key: ItemKey);
-    callback select(key: ItemKey);
+    callback select(key: ItemKey, exclusive: bool);
 
     property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
     property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
@@ -84,7 +84,7 @@ export component LazyList {
             for item[index] in items: ItemView {
                 item: item;
                 open(key) => open(key);
-                select(key) => select(key);
+                select(key, exclusive) => select(key, exclusive);
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
