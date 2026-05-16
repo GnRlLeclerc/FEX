@@ -52,16 +52,16 @@ export global Utils {
 
     // Given a change in selection range, compute the update to send to the backend.
     // Assumes that only one end of the range has changed (as happens when dragging to select).
-    public pure function selection-updates(before: Range, after: Range, offset: int) -> SelectionUpdate {
+    public pure function selection-updates(before: Range, after: Range) -> SelectionUpdate {
         if before.start != after.start {
             return {
                 add: after.start < before.start,
-                range: offset-range(range-from-indices(before.start, after.start), offset),
+                range: range-from-indices(before.start, after.start),
             };
         } else if before.end != after.end {
             return {
                 add: before.end < after.end,
-                range: offset-range(range-from-indices(before.end, after.end), offset),
+                range: range-from-indices(before.end, after.end),
             };
         }
         return { };

@@ -71,7 +71,7 @@ export component LazyList {
                 } else if event.kind == PointerEventKind.move && selecting {
                     let previous-range = Utils.selection-range(anchor.y, cursor.y);
                     let current-range = Utils.selection-range(anchor.y, ta.mouse-y);
-                    let updates = Utils.selection-updates(previous-range, current-range, offset);
+                    let updates = Utils.selection-updates(previous-range, current-range);
                     Callbacks.select-update(updates);
                     cursor = { x: ta.mouse-x, y: ta.mouse-y };
                 }
