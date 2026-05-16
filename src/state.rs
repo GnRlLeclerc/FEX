@@ -37,7 +37,7 @@ pub enum Message {
     },
     /// Thumbnail loaded for an image
     ThumbnailLoaded {
-        key: ItemKey,
+        key: ui::ItemKey,
         buffer: SharedPixelBuffer<Rgba8Pixel>,
     },
     Search {
@@ -84,19 +84,17 @@ impl State {
             .collect::<Vec<SharedString>>();
 
         // 2. Send the cloned slice to the frontend
-        self.explorer
-            .upgrade_in_event_loop(move |explorer| {
-                explorer.set_remaining(remaining as i32);
-                downcast_vec(&explorer.get_items()).set_vec(
-                    new_items
-                        .into_iter()
-                        .map(|item| item.into())
-                        .collect::<Vec<_>>(),
-                );
+        let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
+            explorer.set_remaining(remaining as i32);
+            downcast_vec(&explorer.get_items()).set_vec(
+                new_items
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<_>>(),
+            );
 
-                downcast_vec(&explorer.get_cwd()).set_vec(cwd);
-            })
-            .unwrap();
+            downcast_vec(&explorer.get_cwd()).set_vec(cwd);
+        });
     }
 
     fn handle(&mut self, message: Message) {
@@ -148,14 +146,15 @@ impl State {
                 self.update_ui();
             }
             Message::ThumbnailLoaded { key, buffer } => {
-                let cloned = buffer.clone();
-                self.items.set_thumbnail(key, buffer);
+                self.items.set_thumbnail(key.clone().into(), buffer.clone());
 
                 self.explorer
                     .upgrade_in_event_loop(move |explorer| {
-                        update_item(&explorer, key, move |item| {
-                            item.icon = Image::from_rgba8(cloned)
-                        });
+                        update_items(
+                            &explorer.get_items(),
+                            |item| item.key == key,
+                            move |item| item.icon = Image::from_rgba8(buffer.clone()),
+                        );
                     })
                     .unwrap();
             }
@@ -185,32 +184,5 @@ impl State {
                 });
             }
         }
-    }
-}
-
-/// Update an item by key
-fn update_item<F>(explorer: &Explorer, key: ItemKey, update: F)
-where
-    F: FnOnce(&mut ui::Item),
-{
-    let key: ui::ItemKey = key.into();
-    let items = explorer.get_items();
-    let downcasted = downcast_vec(&items);
-    if let Some(idx) = downcasted
-        .iter()
-        .enumerate()
-        .filter_map(|(i, item)| {
-            if item.key == key {
-                return Some(i);
-            } else {
-                None
-            }
-        })
-        .next()
-        && let Some(row) = downcasted.row_data(idx)
-    {
-        let mut row = row.clone();
-        update(&mut row);
-        downcasted.set_row_data(idx, row);
     }
 }
