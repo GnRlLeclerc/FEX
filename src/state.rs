@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use slint::{Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString, Weak};
+use slint::{Image, Rgba8Pixel, SharedPixelBuffer, SharedString, Weak};
 
-use crate::items::{ItemKey, Items};
+use crate::items::Items;
 use crate::ui::{self, Explorer, downcast_vec, update_items};
 
 pub struct State {
@@ -45,6 +45,7 @@ pub enum Message {
     },
     SelectAll,
     UnselectAll,
+    SelectUpdate(ui::SelectionUpdate),
 }
 
 impl State {
@@ -180,6 +181,18 @@ impl State {
                         &explorer.get_items(),
                         |_| true,
                         |item| item.selected = false,
+                    );
+                });
+            }
+            Message::SelectUpdate(selection_update) => {
+                let selected = selection_update.add;
+                let keys = self.items.update_selection(selection_update);
+
+                let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
+                    update_items(
+                        &explorer.get_items(),
+                        |item| keys.contains(&item.key),
+                        |item| item.selected = selected,
                     );
                 });
             }

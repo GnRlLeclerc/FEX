@@ -1,16 +1,16 @@
-import { Item, ItemView, ItemKey } from "./items.slint";
+import { Item, ItemView } from "./items.slint";
+import { Range, Utils } from "./utils.slint";
 import { ScrollView } from "std-widgets.slint";
 import { Config } from "config.slint";
+import { Callbacks } from "./callbacks.slint";
+
 
 export component LazyList {
     in property <[Item]> items;
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
-    callback refresh-entries(offset: int, limit: int);
-    callback open(key: ItemKey);
-    callback select(key: ItemKey, exclusive: bool);
 
-    property <int> offset: Math.floor(-scroll.viewport-y / 110px); // entries hidden by the current scroll offset
-    property <int> limit: Math.ceil(scroll.visible-height / 110px); // amount of visible entries
+    property <int> offset: Math.floor(-scroll.viewport-y / Config.item-total-height); // entries hidden by the current scroll offset
+    property <int> limit: Math.ceil(scroll.visible-height / Config.item-total-height) + 1; // amount of visible entries
     property <{ x: length, y: length}> anchor;
     property <{ x: length, y: length}> cursor;
     property <bool> selecting: false;
@@ -19,8 +19,8 @@ export component LazyList {
     // Refresh both entries and top padding rectangle at the same time
     // in order to avoid flickering when scrolling at high speed
     function refresh() {
-        refresh-entries(offset, limit);
-        list-padding-top = offset * 110px;
+        Callbacks.refresh-entries(offset, limit);
+        list-padding-top = offset * Config.item-total-height;
     }
 
     changed offset => refresh();
@@ -65,16 +65,21 @@ export component LazyList {
                     selecting = true;
                     anchor = { x: ta.mouse-x, y: ta.mouse-y };
                     cursor = anchor;
+                    Callbacks.select-all(false); // clear selection
                 } else if event.kind == PointerEventKind.up {
                     selecting = false;
                 } else if event.kind == PointerEventKind.move && selecting {
+                    let previous-range = Utils.selection-range(anchor.y, cursor.y);
+                    let current-range = Utils.selection-range(anchor.y, ta.mouse-y);
+                    let updates = Utils.selection-updates(previous-range, current-range, offset);
+                    Callbacks.select-update(updates);
                     cursor = { x: ta.mouse-x, y: ta.mouse-y };
                 }
             }
         }
 
         VerticalLayout {
-            spacing: 10px;
+            spacing: Config.spacing;
 
             // Virtual padding for elements scrolled out of view
             Rectangle {
@@ -83,13 +88,11 @@ export component LazyList {
 
             for item[index] in items: ItemView {
                 item: item;
-                open(key) => open(key);
-                select(key, exclusive) => select(key, exclusive);
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
             Rectangle {
-                height: remaining * 110px;
+                height: remaining * Config.item-total-height;
             }
         }
 

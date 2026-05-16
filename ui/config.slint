@@ -1,5 +1,10 @@
 // Global configuration for all components
 export global Config {
+    // Lazy list spacing
+    in-out property <length> spacing: 10px;
+    in-out property <length> item-height: 100px;
+    out property <length> item-total-height: item-height + spacing;
+
     // Scroll with cursor during selection
     in-out property <duration> scroll-tick: 16ms;
     in-out property <length> scroll-max-delta: 30px;

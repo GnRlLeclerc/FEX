@@ -1,8 +1,7 @@
-/// Item key u64 workaround
-export struct ItemKey {
-    upper: int,
-    lower: int,
-}
+import { Config } from "config.slint";
+import { Callbacks } from "./callbacks.slint";
+import { ItemKey } from "./utils.slint";
+
 
 export struct Item {
     key: ItemKey,
@@ -13,12 +12,10 @@ export struct Item {
 
 export component ItemView inherits Rectangle {
     in-out property <Item> item;
-    callback select(key: ItemKey, exclusive: bool);
-    callback open(key: ItemKey);
 
     background: ta.has-hover ? red : item.selected ? grey : transparent;
 
-    height: 100px;
+    height: Config.item-height;
     border-radius: 15px;
 
     property <bool> ctrl: false;
@@ -32,8 +29,8 @@ export component ItemView inherits Rectangle {
             shift = event.modifiers.shift;
         }
 
-        clicked => select(item.key, !ctrl);
-        double-clicked => open(item.key);
+        clicked => Callbacks.select(item.key, !ctrl);
+        double-clicked => Callbacks.open(item.key);
     }
 
     HorizontalLayout {

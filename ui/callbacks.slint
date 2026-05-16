@@ -1,0 +1,14 @@
+// Global callbacks
+
+import { SelectionUpdate, ItemKey } from "./utils.slint";
+
+
+export global Callbacks {
+    callback open(key: ItemKey);
+    callback select(key: ItemKey, exclusive: bool);
+    callback navigate(count: int); // navigate to the i-th cwd component
+    callback refresh-entries(offset: int, limit: int);
+    callback search(text: string);
+    callback select-all(select: bool); // select / unselect all
+    callback select-update(update: SelectionUpdate);
+}

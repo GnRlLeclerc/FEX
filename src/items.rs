@@ -139,6 +139,22 @@ impl Items {
         self.selected.clear();
     }
 
+    /// Update selection by range, and return the affected keys
+    /// for granular update in the frontend.
+    pub fn update_selection(&mut self, update: ui::SelectionUpdate) -> Vec<ui::ItemKey> {
+        self.filtered
+            .as_ref()
+            .unwrap_or(&self.sorted)
+            .iter()
+            .skip(update.range.start as usize)
+            .take((update.range.end - update.range.start) as usize)
+            .map(|key| {
+                self.items[*key].selected = update.add;
+                (*key).into()
+            })
+            .collect()
+    }
+
     /// Get a slice of items ready to be sent to the UI
     pub fn slice(&self, offset: usize, limit: usize) -> Vec<ItemData> {
         self.filtered

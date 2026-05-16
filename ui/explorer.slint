@@ -1,8 +1,13 @@
 import { Button, ScrollView, LineEdit } from "std-widgets.slint";
-import { Item, ItemKey } from "./items.slint";
+import { Item } from "./items.slint";
+import { ItemKey } from "./utils.slint";
 import { LazyList } from "./lazylist.slint";
 import { Search, SearchState } from "./search.slint";
+import { Callbacks } from "./callbacks.slint";
 
+
+// Re-export global singletons to make them accessible from rust
+export { Callbacks } from "./callbacks.slint";
 
 export component Explorer inherits Window {
     forward-focus: scope;
@@ -19,14 +24,6 @@ export component Explorer inherits Window {
         }
     }
 
-    callback open(key: ItemKey);
-    callback select(key: ItemKey, exclusive: bool);
-    callback navigate(count: int); // navigate to the i-th cwd component
-    callback refresh-entries(offset: int, limit: int);
-    callback search(text: string);
-    callback select-all(select: bool); // select / unselect all
-
-    // Reset scroll (call this after navigating)
     public function reset-scroll() {
         lazy.reset-scroll();
     }
@@ -48,9 +45,9 @@ export component Explorer inherits Window {
                     state = SearchState.inspecting;
                 } else if state == SearchState.inspecting {
                     state = SearchState.browsing;
-                    search("");
+                    Callbacks.search("");
                 } else if state == SearchState.browsing {
-                    select-all(false);
+                    Callbacks.select-all(false);
                 }
             }
         }
@@ -58,7 +55,7 @@ export component Explorer inherits Window {
         KeyBinding {
             keys: @keys(Control + A);
             activated => {
-                select-all(true);
+                Callbacks.select-all(true);
             }
         }
 
@@ -69,7 +66,7 @@ export component Explorer inherits Window {
                     for item[index] in cwd: Button {
                         text: item;
                         clicked => {
-                            navigate(index);
+                            Callbacks.navigate(index);
                             lazy.reset-scroll();
                         };
                     }
@@ -78,7 +75,7 @@ export component Explorer inherits Window {
 
             if state != SearchState.browsing: Search {
                 search(text) => {
-                    search(text);
+                    Callbacks.search(text);
                     reset-scroll();
                 }
                 state <=> root.state;
@@ -87,9 +84,6 @@ export component Explorer inherits Window {
             lazy := LazyList {
                 items: items;
                 remaining: remaining;
-                refresh-entries(offset, limit) => refresh-entries(offset, limit);
-                open(key) => open(key);
-                select(key, exclusive) => select(key, exclusive);
             }
         }
     }

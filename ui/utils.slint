@@ -1,0 +1,69 @@
+// Math utils and structs
+
+import { Config } from "./config.slint";
+
+/// Item key u64 workaround
+export struct ItemKey {
+    upper: int,
+    lower: int,
+}
+
+export struct Range {
+    start: int,
+    end: int,
+}
+
+export struct SelectionUpdate {
+    // Whether to add or remove this range
+    add: bool,
+    range: Range,
+}
+
+export global Utils {
+    // Compute the index selection range of items from selection positions
+    public pure function selection-range(pos1: length, pos2: length) -> Range {
+        let start-pos = min(pos1, pos2);
+        let end-pos = max(pos1, pos2);
+
+        let start = start-pos / Config.item-total-height;
+        let end = (end-pos + Config.item-height) / Config.item-total-height;
+        return { start: start, end: end };
+    }
+
+    public pure function range-from-indices(index1: int, index2: int) -> Range {
+        return {
+            start: min(index1, index2),
+            end: max(index1, index2),
+        };
+    }
+
+    public pure function offset-range(range: Range, offset: int) -> Range {
+        return {
+            start: range.start + offset,
+            end: range.end + offset,
+        };
+    }
+
+    // Returns whether the range is empty.
+    // In this case, don't send updates to the backend.
+    public pure function empty-range(range: Range) -> bool {
+        return range.start == range.end;
+    }
+
+    // Given a change in selection range, compute the update to send to the backend.
+    // Assumes that only one end of the range has changed (as happens when dragging to select).
+    public pure function selection-updates(before: Range, after: Range, offset: int) -> SelectionUpdate {
+        if before.start != after.start {
+            return {
+                add: after.start < before.start,
+                range: offset-range(range-from-indices(before.start, after.start), offset),
+            };
+        } else if before.end != after.end {
+            return {
+                add: before.end < after.end,
+                range: offset-range(range-from-indices(before.end, after.end), offset),
+            };
+        }
+        return { };
+    }
+}

@@ -2,8 +2,9 @@ use std::{rc::Rc, thread};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::state::{Message, State};
+use crate::{callbacks::register_callbacks, state::State};
 
+mod callbacks;
 mod config;
 mod icons;
 mod items;
@@ -19,47 +20,7 @@ fn main() {
 
     let weak = explorer.as_weak();
     let (mut state, tx) = State::new(weak);
-
-    let txc = tx.clone();
-    explorer.on_refresh_entries(move |offset, limit| {
-        txc.send(Message::RefreshSlice {
-            offset: offset as usize,
-            limit: limit as usize,
-        })
-        .unwrap();
-    });
-
-    let txc = tx.clone();
-    explorer.on_open(move |key| {
-        txc.send(Message::Open { key }).unwrap();
-    });
-
-    let txc = tx.clone();
-    explorer.on_navigate(move |subcomponent| {
-        txc.send(Message::Navigate {
-            subcomponent: subcomponent as usize,
-        })
-        .unwrap();
-    });
-
-    let txc = tx.clone();
-    explorer.on_search(move |text| {
-        txc.send(Message::Search { text }).unwrap();
-    });
-
-    let txc = tx.clone();
-    explorer.on_select(move |key, exclusive| {
-        txc.send(Message::Select { key, exclusive }).unwrap();
-    });
-
-    let txc = tx.clone();
-    explorer.on_select_all(move |select| {
-        txc.send(match select {
-            true => Message::SelectAll,
-            false => Message::UnselectAll,
-        })
-        .unwrap();
-    });
+    register_callbacks(&explorer, tx);
 
     let _ = thread::spawn(move || {
         state.event_loop();
