@@ -23,8 +23,6 @@ pub struct Thumbnails {
 
 impl Thumbnails {
     /// Create a new thumbnail processing instance.
-    /// Call this function in the background thread where the processing
-    /// should happen.
     pub fn new(rx: Receiver<Vec<(ItemKey, PathBuf)>>, tx: Sender<Message>) -> Self {
         Self {
             amt: AMT::new(&AMTConfiguration::default()),

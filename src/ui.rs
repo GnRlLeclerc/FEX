@@ -43,7 +43,7 @@ where
 /// only the needed fields from items::Item, and that can be sent between
 /// threads.
 pub struct ItemData {
-    key: items::ItemKey,
+    pub key: items::ItemKey,
     name: SharedString,
     folder: bool,
     icon: Icon,

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer, SharedString, Weak};
 
-use crate::items::Items;
+use crate::items::{ItemKey, Items};
 use crate::ui::{self, Explorer, downcast_vec, update_items};
 
 pub struct State {
@@ -13,6 +13,7 @@ pub struct State {
     cwd: PathBuf,
     items: Items,
     explorer: Weak<Explorer>,
+    thumbnail_tx: Sender<Vec<(ItemKey, PathBuf)>>,
 }
 
 pub enum Message {
@@ -49,23 +50,24 @@ pub enum Message {
 }
 
 impl State {
-    pub fn new(explorer: Weak<Explorer>) -> (Self, Sender<Message>) {
-        let (tx, rx) = mpsc::channel();
+    pub fn new(
+        explorer: Weak<Explorer>,
+        rx: Receiver<Message>,
+        thumbnail_tx: Sender<Vec<(ItemKey, PathBuf)>>,
+    ) -> Self {
         let cwd = std::env::current_dir().unwrap();
         let mut items = Items::new();
         items.load(&cwd);
 
-        (
-            Self {
-                recv: rx,
-                offset: 0,
-                limit: 0,
-                cwd,
-                items,
-                explorer,
-            },
-            tx,
-        )
+        Self {
+            recv: rx,
+            offset: 0,
+            limit: 0,
+            cwd,
+            items,
+            explorer,
+            thumbnail_tx,
+        }
     }
 
     pub fn event_loop(&mut self) {
@@ -77,6 +79,11 @@ impl State {
     fn update_ui(&mut self) {
         // 1. Compute items cloned slice to send to the frontend
         let new_items = self.items.slice(self.offset, self.limit);
+        let paths = self.items.prepare_thumbnails_for_slice(&new_items);
+        if !paths.is_empty() {
+            self.thumbnail_tx.send(paths).unwrap();
+        }
+
         let remaining = self.items.len().saturating_sub(self.offset + self.limit);
         let cwd = self
             .cwd

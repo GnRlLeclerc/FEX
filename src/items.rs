@@ -62,6 +62,15 @@ pub struct Item {
     pub icon: Icon,
 }
 
+impl Item {
+    pub fn is_image(&self) -> bool {
+        if let Metadata::File { mimes, .. } = &self.metadata {
+            return mimes.iter().any(|mime| mime.type_() == mime::IMAGE);
+        }
+        false
+    }
+}
+
 /// File explorer items.
 ///
 /// Items are stored in a slotmap.
@@ -111,6 +120,24 @@ impl Items {
 
     pub fn set_thumbnail(&mut self, key: ItemKey, buffer: SharedPixelBuffer<Rgba8Pixel>) {
         self.items[key].icon = Icon::Thumbnail(buffer);
+    }
+
+    /// Extract a list of images whose thumbnails have not been computed / loaded yet.
+    pub fn prepare_thumbnails_for_slice(&self, slice: &[ItemData]) -> Vec<(ItemKey, PathBuf)> {
+        slice
+            .iter()
+            .filter_map(|item| {
+                let item = &self.items[item.key];
+
+                match item.is_image() {
+                    true => match item.icon {
+                        Icon::Thumbnail(_) => None,
+                        _ => Some((item.key, item.path.clone())),
+                    },
+                    false => None,
+                }
+            })
+            .collect()
     }
 
     pub fn select(&mut self, key: ItemKey) {

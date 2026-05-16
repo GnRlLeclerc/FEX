@@ -1,7 +1,9 @@
+use std::sync::mpsc::channel;
 use std::{rc::Rc, thread};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
+use crate::thumbnails::Thumbnails;
 use crate::{callbacks::register_callbacks, state::State};
 
 mod callbacks;
@@ -19,11 +21,19 @@ fn main() {
     explorer.set_cwd(ModelRc::from(Rc::new(VecModel::default()))); // Initialize with an empty vecmodel
 
     let weak = explorer.as_weak();
-    let (mut state, tx) = State::new(weak);
+    let (tx, rx) = channel();
+    let (tx2, rx2) = channel();
+    let mut state = State::new(weak, rx, tx2);
+    let mut thumbnails = Thumbnails::new(rx2, tx.clone());
+
     register_callbacks(&explorer, tx);
 
     let _ = thread::spawn(move || {
         state.event_loop();
+    });
+
+    let _ = thread::spawn(move || {
+        thumbnails.event_loop();
     });
 
     explorer.run().unwrap();

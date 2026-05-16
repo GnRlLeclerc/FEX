@@ -67,6 +67,8 @@ export component Explorer inherits Window {
                         text: item;
                         clicked => {
                             Callbacks.navigate(index);
+                            state = SearchState.browsing;
+                            Callbacks.search("");
                             lazy.reset-scroll();
                         };
                     }
