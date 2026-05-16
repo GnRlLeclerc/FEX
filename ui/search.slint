@@ -1,6 +1,7 @@
 // Top bar filtering search
 
 import { LineEdit } from "std-widgets.slint";
+import { Callbacks } from "./callbacks.slint";
 
 export enum SearchState {
     searching, // typing while in search mode
@@ -39,6 +40,7 @@ export component Search {
 
     line := LineEdit {
         edited(text) => {
+            Callbacks.select-all(false); // reset selection
             search(text);
         }
     }

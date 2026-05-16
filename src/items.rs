@@ -150,6 +150,10 @@ impl Items {
             .take((update.range.end - update.range.start) as usize)
             .map(|key| {
                 self.items[*key].selected = update.add;
+                match update.add {
+                    true => self.selected.insert(*key),
+                    false => self.selected.remove(key),
+                };
                 (*key).into()
             })
             .collect()
