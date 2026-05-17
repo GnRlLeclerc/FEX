@@ -66,4 +66,11 @@ export global Utils {
         }
         return { };
     }
+
+    // Compute a selection update from a change in selection position, with the given anchor
+    public pure function selection-updates-from-pos(anchor: length, before: length, after: length) -> SelectionUpdate {
+        let previous-range = Utils.selection-range(anchor, before);
+        let current-range = Utils.selection-range(anchor, after);
+        return Utils.selection-updates(previous-range, current-range);
+    }
 }
