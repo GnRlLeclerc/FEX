@@ -8,6 +8,7 @@ import { Callbacks } from "./callbacks.slint";
 
 // Re-export global singletons to make them accessible from rust
 export { Callbacks } from "./callbacks.slint";
+export { Config } from "./config.slint";
 
 export component Explorer inherits Window {
     forward-focus: scope;
@@ -59,6 +60,40 @@ export component Explorer inherits Window {
             }
         }
 
+        KeyBinding {
+            keys: @keys(UpArrow);
+            activated => {
+                lazy.up(false);
+            }
+        }
+
+        KeyBinding {
+            keys: @keys(Control + K);
+            activated => {
+                lazy.up(false);
+            }
+        }
+
+        KeyBinding {
+            keys: @keys(DownArrow);
+            activated => {
+                lazy.down(false);
+            }
+        }
+
+        KeyBinding {
+            keys: @keys(Control + J);
+            activated => {
+                lazy.down(false);
+            }
+        }
+
+        KeyBinding {
+            keys: @keys(Return);
+            activated => {
+                lazy.enter();
+            }
+        }
         VerticalLayout {
             if state == SearchState.browsing: ScrollView {
                 height: 50px;

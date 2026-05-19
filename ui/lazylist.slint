@@ -8,11 +8,50 @@ import { Callbacks } from "./callbacks.slint";
 export component LazyList {
     in property <[Item]> items;
     in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
+    property <int> cursor: -1;
+
+    public function enter() {
+        if cursor != -1 {
+            let item = items[cursor - offset];
+            Callbacks.open(item.key);
+        }
+    }
+
+    // Set the cursor to the topmost visible element,
+    // and fully scroll it into view.
+    public function set-cursor() {
+        cursor = offset;
+        scroll.viewport-y = -cursor * Config.item-total-height;
+    }
+
+    public function up(select: bool) {
+        if cursor == -1 {
+            set-cursor();
+        } else if cursor > 0 {
+            cursor -= 1;
+            let delta = -cursor * Config.item-total-height - scroll.viewport-y;
+            if delta > 0 {
+                scroll.viewport-y = -cursor * Config.item-total-height;
+            }
+        }
+    }
+
+    public function down(select: bool) {
+        if cursor == -1 {
+            set-cursor();
+        } else if cursor < offset + items.length + remaining - 1 {
+            cursor += 1;
+            let delta = -cursor * Config.item-total-height - scroll.viewport-y + scroll.visible-height - Config.item-total-height;
+            if delta < 0 {
+                scroll.viewport-y = -cursor * Config.item-total-height + scroll.visible-height - Config.item-total-height;
+            }
+        }
+    }
 
     property <int> offset: Math.floor(-scroll.viewport-y / Config.item-total-height); // entries hidden by the current scroll offset
     property <int> limit: Math.ceil(scroll.visible-height / Config.item-total-height) + 1; // amount of visible entries
     property <{ x: length, y: length}> anchor;
-    property <{ x: length, y: length}> cursor;
+    property <{ x: length, y: length}> mouse;
     property <bool> selecting: false;
     property <length> list-padding-top;
 
@@ -41,47 +80,53 @@ export component LazyList {
             let bottom = scroll.y + scroll.visible-height - scroll.viewport-y - range;
 
             // Check proximity to bottom
-            if cursor.y > bottom {
-                let speed = min((cursor.y - bottom) / range, 1);
+            if mouse.y > bottom {
+                let speed = min((mouse.y - bottom) / range, 1);
                 let delta = speed * speed * Config.scroll-max-delta;
                 let clamped = min(delta, scroll.viewport-height - scroll.visible-height + scroll.viewport-y);
 
                 // Update selection
-                let updates = Utils.selection-updates-from-pos(anchor.y, cursor.y, cursor.y + clamped);
+                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y + clamped);
                 Callbacks.select-update(updates);
 
-                cursor.y += clamped;
+                mouse.y += clamped;
                 scroll.viewport-y -= clamped;
             // Check proximity to top
-            } else if cursor.y < top {
-                let speed = min((top - cursor.y) / range, 1);
+            } else if mouse.y < top {
+                let speed = min((top - mouse.y) / range, 1);
                 let delta = speed * speed * Config.scroll-max-delta;
                 let clamped = min(delta, -scroll.viewport-y);
 
                 // Update selection
-                let updates = Utils.selection-updates-from-pos(anchor.y, cursor.y, cursor.y - clamped);
+                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y - clamped);
                 Callbacks.select-update(updates);
 
-                cursor.y -= clamped;
+                mouse.y -= clamped;
                 scroll.viewport-y += clamped;
             }
         }
     }
 
     scroll := ScrollView {
+        animate viewport-y { duration: 50ms; }
+
+        scrolled => {
+            cursor = -1;
+        }
+
         ta := TouchArea {
             pointer-event(event) => {
                 if event.kind == PointerEventKind.down {
                     selecting = true;
                     anchor = { x: ta.mouse-x, y: ta.mouse-y };
-                    cursor = anchor;
+                    mouse = anchor;
                     Callbacks.select-all(false); // clear selection
                 } else if event.kind == PointerEventKind.up {
                     selecting = false;
                 } else if event.kind == PointerEventKind.move && selecting {
-                    let updates = Utils.selection-updates-from-pos(anchor.y, cursor.y, ta.mouse-y);
+                    let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, ta.mouse-y);
                     Callbacks.select-update(updates);
-                    cursor = { x: ta.mouse-x, y: ta.mouse-y };
+                    mouse = { x: ta.mouse-x, y: ta.mouse-y };
                 }
             }
         }
@@ -96,6 +141,7 @@ export component LazyList {
 
             for item[index] in items: ItemView {
                 item: item;
+                has-cursor: index + offset == cursor;
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
@@ -112,11 +158,11 @@ export component LazyList {
             border-width: 2px;
             border-radius: 5px;
 
-            x: Math.min(anchor.x, cursor.x);
-            y: Math.min(anchor.y, cursor.y);
+            x: Math.min(anchor.x, mouse.x);
+            y: Math.min(anchor.y, mouse.y);
 
-            width: Math.abs(cursor.x - anchor.x);
-            height: Math.abs(cursor.y - anchor.y);
+            width: Math.abs(mouse.x - anchor.x);
+            height: Math.abs(mouse.y - anchor.y);
         }
     }
 }

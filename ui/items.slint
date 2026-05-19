@@ -11,9 +11,12 @@ export struct Item {
 }
 
 export component ItemView inherits Rectangle {
-    in-out property <Item> item;
+    in property <Item> item;
+    in property <bool> has-cursor: false;
 
     background: ta.has-hover ? red : item.selected ? grey : transparent;
+    border-width: has-cursor ? 2px : 0px;
+    border-color: white;
 
     height: Config.item-height;
     border-radius: 15px;
