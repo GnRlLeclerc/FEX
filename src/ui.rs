@@ -1,7 +1,7 @@
 use slint::{Image, Model, ModelRc, SharedString, VecModel};
 use slotmap::{Key, KeyData};
 
-use crate::items::{self, Icon};
+use crate::items::{self, Icon, Metadata};
 
 slint::include_modules!();
 
@@ -50,15 +50,23 @@ pub struct ItemData {
     selected: bool,
 }
 
-impl From<&items::Item> for ItemData {
-    fn from(item: &items::Item) -> Self {
-        Self {
-            key: item.key,
-            name: item.name.clone(),
-            folder: item.metadata.is_folder(),
-            icon: item.icon.clone(),
-            selected: item.selected,
-        }
+impl TryFrom<&(items::Item, Metadata)> for ItemData {
+    type Error = ();
+
+    fn try_from(item: &(items::Item, Metadata)) -> Result<Self, Self::Error> {
+        let icon = match &item.1 {
+            Metadata::File(file) => file.icon.clone(),
+            Metadata::Folder(folder) => folder.icon.clone(),
+            _ => return Err(()),
+        };
+
+        Ok(Self {
+            key: item.0.key,
+            name: item.0.name.clone(),
+            folder: item.1.is_folder(),
+            selected: item.0.selected,
+            icon,
+        })
     }
 }
 

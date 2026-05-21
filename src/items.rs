@@ -7,7 +7,7 @@ use std::{
 
 use mime::Mime;
 use slint::{Rgba8Pixel, SharedPixelBuffer, SharedString};
-use slotmap::{Key, KeyData, SlotMap, new_key_type};
+use slotmap::{Key, SlotMap, new_key_type};
 use unidecode::unidecode;
 
 use crate::{
@@ -20,17 +20,110 @@ new_key_type! {
     pub struct ItemKey;
 }
 
-#[derive(Clone)]
+// ************************************************************************* //
+//                                    STRUCTS                                //
+// ************************************************************************* //
+
+pub struct Item {
+    pub key: ItemKey,
+    pub path: PathBuf,
+    pub selected: bool,
+    pub normalized_name: String,
+    pub name: SharedString,
+}
+
 pub enum Metadata {
-    Folder { children: usize },
-    File { mimes: Vec<Mime>, size: u64 },
+    File(File),
+    Folder(Folder),
+    LazyFile(LazyFile),
+    LazyFolder(LazyFolder),
 }
 
 impl Metadata {
     pub fn is_folder(&self) -> bool {
-        matches!(self, Self::Folder { .. })
+        matches!(self, Metadata::Folder(_) | Metadata::LazyFolder(_))
+    }
+
+    pub fn set_thumbnail(&mut self, buffer: SharedPixelBuffer<Rgba8Pixel>) {
+        if let Metadata::File(metadata) = self {
+            metadata.icon = Icon::Thumbnail(buffer);
+        }
+    }
+
+    pub fn should_load_thumbnail(&self) -> bool {
+        match self {
+            Metadata::File(metadata) => {
+                metadata.is_image() && matches!(metadata.icon, Icon::Path(_))
+            }
+            _ => false,
+        }
+    }
+
+    pub fn load(&mut self, item: &Item, icons: &mut Icons) {
+        match self {
+            Metadata::LazyFile(file) => *self = Metadata::File(file.load(item, icons)),
+            Metadata::LazyFolder(folder) => *self = Metadata::Folder(folder.load(item, icons)),
+            _ => {}
+        }
     }
 }
+
+// ***************************************************** //
+//                   LAZY-LOADED METADATA                //
+// ***************************************************** //
+
+pub struct LazyFile {
+    pub size: u64,
+}
+
+pub struct LazyFolder {}
+
+impl LazyFile {
+    pub fn load(&self, item: &Item, icons: &mut Icons) -> File {
+        let mimes = icons.get_mimes(&item.name);
+        let icon = Icon::Path(Arc::new(icons.get_icon(&mimes)));
+
+        File {
+            size: self.size,
+            icon,
+            mimes,
+        }
+    }
+}
+
+impl LazyFolder {
+    pub fn load(&self, item: &Item, icons: &Icons) -> Folder {
+        let icon = Icon::Path(icons.get_folder());
+        let children = fs::read_dir(&item.path).iter().count();
+
+        Folder { icon, children }
+    }
+}
+
+// ***************************************************** //
+//                  FULLY-LOADED METADATA                //
+// ***************************************************** //
+
+pub struct File {
+    pub icon: Icon,
+    pub mimes: Vec<Mime>,
+    pub size: u64,
+}
+
+pub struct Folder {
+    pub icon: Icon,
+    pub children: usize,
+}
+
+impl File {
+    pub fn is_image(&self) -> bool {
+        return self.mimes.iter().any(|mime| mime.type_() == mime::IMAGE);
+    }
+}
+
+// ***************************************************** //
+//                        ITEM ICON                      //
+// ***************************************************** //
 
 /// Item icon.
 #[derive(Clone)]
@@ -52,24 +145,9 @@ pub enum Icon {
     Thumbnail(SharedPixelBuffer<Rgba8Pixel>),
 }
 
-pub struct Item {
-    pub key: ItemKey,
-    path: PathBuf,
-    pub selected: bool,
-    pub normalized_name: String,
-    pub name: SharedString,
-    pub metadata: Metadata,
-    pub icon: Icon,
-}
-
-impl Item {
-    pub fn is_image(&self) -> bool {
-        if let Metadata::File { mimes, .. } = &self.metadata {
-            return mimes.iter().any(|mime| mime.type_() == mime::IMAGE);
-        }
-        false
-    }
-}
+// ************************************************************************* //
+//                                    STORAGE                                //
+// ************************************************************************* //
 
 /// File explorer items.
 ///
@@ -81,7 +159,7 @@ pub struct Items {
     filter: Option<Vec<String>>,
     filtered: Option<Vec<ItemKey>>,
     icons: Icons,
-    items: SlotMap<ItemKey, Item>,
+    items: SlotMap<ItemKey, (Item, Metadata)>,
     by_path: HashMap<PathBuf, ItemKey>,
     selected: HashSet<ItemKey>,
 }
@@ -108,10 +186,8 @@ impl Items {
     }
 
     pub fn open(&self, key: ui::ItemKey) -> Option<&Path> {
-        let i = ((key.upper as u64) << 32) | (key.lower as u64);
-        let key = ItemKey::from(KeyData::from_ffi(i));
-        if let Some(item) = self.items.get(key)
-            && let Metadata::Folder { .. } = item.metadata
+        if let Some((item, metadata)) = self.items.get(key.into())
+            && metadata.is_folder()
         {
             return Some(&item.path);
         }
@@ -119,7 +195,7 @@ impl Items {
     }
 
     pub fn set_thumbnail(&mut self, key: ItemKey, buffer: SharedPixelBuffer<Rgba8Pixel>) {
-        self.items[key].icon = Icon::Thumbnail(buffer);
+        self.items[key].1.set_thumbnail(buffer);
     }
 
     /// Extract a list of images whose thumbnails have not been computed / loaded yet.
@@ -127,13 +203,10 @@ impl Items {
         slice
             .iter()
             .filter_map(|item| {
-                let item = &self.items[item.key];
+                let (item, metadata) = &self.items[item.key];
 
-                match item.is_image() {
-                    true => match item.icon {
-                        Icon::Thumbnail(_) => None,
-                        _ => Some((item.key, item.path.clone())),
-                    },
+                match metadata.should_load_thumbnail() {
+                    true => Some((item.key, item.path.clone())),
                     false => None,
                 }
             })
@@ -142,7 +215,7 @@ impl Items {
 
     pub fn select(&mut self, key: ItemKey) {
         self.selected.insert(key);
-        self.items[key].selected = true;
+        self.items[key].0.selected = true;
     }
 
     pub fn select_all(&mut self) {
@@ -155,13 +228,13 @@ impl Items {
             .collect();
 
         for key in &self.selected {
-            self.items[*key].selected = true;
+            self.items[*key].0.selected = true;
         }
     }
 
     pub fn unselect_all(&mut self) {
         for key in self.selected.iter() {
-            self.items[*key].selected = false;
+            self.items[*key].0.selected = false;
         }
         self.selected.clear();
     }
@@ -176,7 +249,7 @@ impl Items {
             .skip(update.range.start as usize)
             .take((update.range.end - update.range.start) as usize)
             .map(|key| {
-                self.items[*key].selected = update.add;
+                self.items[*key].0.selected = update.add;
                 match update.add {
                     true => self.selected.insert(*key),
                     false => self.selected.remove(key),
@@ -187,20 +260,24 @@ impl Items {
     }
 
     /// Get a slice of items ready to be sent to the UI
-    pub fn slice(&self, offset: usize, limit: usize) -> Vec<ItemData> {
+    pub fn slice(&mut self, offset: usize, limit: usize) -> Vec<ItemData> {
         self.filtered
-            .as_ref()
-            .unwrap_or(&self.sorted)
-            .iter()
+            .as_mut()
+            .unwrap_or(&mut self.sorted)
+            .iter_mut()
             .skip(offset)
             .take(limit)
-            .map(|key| (&self.items[*key]).into())
+            .filter_map(|key| {
+                let item = &mut self.items[*key];
+                item.1.load(&item.0, &mut self.icons);
+                (&*item).try_into().ok() // should never fail
+            })
             .collect()
     }
 
     pub fn remove(&mut self, key: ItemKey) {
         if let Some(item) = self.items.remove(key) {
-            self.by_path.remove(&item.path);
+            self.by_path.remove(&item.0.path);
             self.selected.remove(&key);
             self.sorted.retain(|k| *k != key);
             if let Some(filtered) = &mut self.filtered {
@@ -209,11 +286,11 @@ impl Items {
         }
     }
 
-    pub fn insert(&mut self, item: Item) {
+    pub fn insert(&mut self, item: (Item, Metadata)) {
         let key = self.items.insert(item);
-        self.items[key].key = key;
+        self.items[key].0.key = key;
         let item = &self.items[key];
-        self.by_path.insert(item.path.clone(), key);
+        self.by_path.insert(item.0.path.clone(), key);
         self.sort.insert(item, &mut self.sorted, &self.items);
         if let Some(filtered) = &mut self.filtered {
             self.sort.insert(item, filtered, &self.items);
@@ -258,7 +335,7 @@ impl Items {
                     .filter(|&key| {
                         filter
                             .iter()
-                            .all(|s| self.items[*key].normalized_name.contains(s))
+                            .all(|s| self.items[*key].0.normalized_name.contains(s))
                     })
                     .cloned()
                     .collect::<Vec<_>>(),
@@ -279,7 +356,7 @@ impl Items {
         // Collect items
         let mut items = read_dir
             .filter_map(|entry| entry.ok())
-            .filter_map(|entry| process_entry(&entry, &mut self.icons))
+            .filter_map(process_entry)
             .collect::<Vec<_>>();
 
         // Sort items
@@ -288,47 +365,33 @@ impl Items {
         // Insert into containers
         items.into_iter().for_each(|item| {
             let key = self.items.insert(item);
-            self.items[key].key = key;
+            self.items[key].0.key = key;
             let item = &mut self.items[key];
-            self.by_path.insert(item.path.clone(), key);
+            self.by_path.insert(item.0.path.clone(), key);
             self.sorted.push(key);
         });
     }
 }
 
-fn process_entry(entry: &DirEntry, icons: &mut Icons) -> Option<Item> {
+fn process_entry(entry: DirEntry) -> Option<(Item, Metadata)> {
     let name: SharedString = entry.file_name().to_string_lossy().to_string().into();
     let meta = fs::metadata(entry.path()).ok()?;
 
-    let (metadata, icon) = match meta.is_dir() {
-        true => (
-            Metadata::Folder {
-                children: fs::read_dir(entry.path())
-                    .map(|iter| iter.count())
-                    .unwrap_or(0),
-            },
-            Icon::Path(icons.get_folder().into()),
-        ),
-        false => {
-            let mimes = icons.get_mimes(&name);
-            let icon = icons.get_icon(&mimes);
-            (
-                Metadata::File {
-                    mimes,
-                    size: entry.metadata().map(|m| m.len()).unwrap_or(0),
-                },
-                Icon::Path(icon.into()),
-            )
-        }
+    let metadata = match meta.is_dir() {
+        true => Metadata::LazyFolder(LazyFolder {}),
+        false => Metadata::LazyFile(LazyFile {
+            size: entry.metadata().map(|m| m.len()).unwrap_or(0),
+        }),
     };
 
-    Some(Item {
-        key: ItemKey::null(),
-        normalized_name: unidecode(&name.to_lowercase()),
-        name,
-        path: entry.path(),
-        selected: false,
+    Some((
+        Item {
+            key: ItemKey::null(),
+            path: entry.path(),
+            selected: false,
+            normalized_name: unidecode(&name.to_lowercase()),
+            name,
+        },
         metadata,
-        icon,
-    })
+    ))
 }

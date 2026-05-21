@@ -28,20 +28,19 @@ pub struct Sort {
 }
 
 impl Sort {
-    pub fn compare(&self, a: &Item, b: &Item) -> Ordering {
-        let ordering = match (&a.metadata, &b.metadata, &self.by) {
-            (Metadata::Folder { .. }, Metadata::File { .. }, _) => return Ordering::Less,
-            (Metadata::File { .. }, Metadata::Folder { .. }, _) => return Ordering::Greater,
-            (_, _, SortBy::Name) => a.normalized_name.cmp(&b.normalized_name),
-            (Metadata::File { size: a, .. }, Metadata::File { size: b, .. }, SortBy::Size) => {
-                a.cmp(b)
-            }
-            (Metadata::Folder { children: a }, Metadata::Folder { children: b }, SortBy::Size) => {
-                a.cmp(b)
-            }
-            (Metadata::File { mimes: a, .. }, Metadata::File { mimes: b, .. }, SortBy::Type) => {
-                a.iter().cmp(b.iter())
-            }
+    pub fn compare(&self, a: &(Item, Metadata), b: &(Item, Metadata)) -> Ordering {
+        let ordering = match (&a.1, &b.1, &self.by) {
+            (
+                Metadata::Folder(_) | Metadata::LazyFolder(_),
+                Metadata::File(_) | Metadata::LazyFile(_),
+                _,
+            ) => return Ordering::Less,
+            (
+                Metadata::File(_) | Metadata::LazyFile(_),
+                Metadata::Folder(_) | Metadata::LazyFolder(_),
+                _,
+            ) => return Ordering::Greater,
+            (_, _, SortBy::Name) => a.0.normalized_name.cmp(&b.0.normalized_name),
             _ => Ordering::Equal,
         };
 
@@ -52,7 +51,7 @@ impl Sort {
     }
 
     /// Sort a vector of keys backed by a slotmap
-    pub fn sort(&self, slice: &mut [ItemKey], items: &SlotMap<ItemKey, Item>) {
+    pub fn sort(&self, slice: &mut [ItemKey], items: &SlotMap<ItemKey, (Item, Metadata)>) {
         slice.sort_by(|a, b| {
             let item_a = &items[*a];
             let item_b = &items[*b];
@@ -61,10 +60,15 @@ impl Sort {
     }
 
     /// Insert a key in a vector backed by a slotmap, keeping it sorted
-    pub fn insert(&self, item: &Item, vec: &mut Vec<ItemKey>, items: &SlotMap<ItemKey, Item>) {
+    pub fn insert(
+        &self,
+        item: &(Item, Metadata),
+        vec: &mut Vec<ItemKey>,
+        items: &SlotMap<ItemKey, (Item, Metadata)>,
+    ) {
         let index = vec
             .binary_search_by(|key| self.compare(&item, &items[*key]))
             .unwrap_or_else(|e| e);
-        vec.insert(index, item.key);
+        vec.insert(index, item.0.key);
     }
 }

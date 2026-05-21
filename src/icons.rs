@@ -1,7 +1,7 @@
 //! Loading file icons and image thumbnails
 
 use mime::Mime;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use xdg_mime::SharedMimeInfo;
 
 use freedesktop_icons::lookup;
@@ -11,7 +11,7 @@ pub struct Icons {
     db: SharedMimeInfo,
     theme: String,
     size: u16,
-    folder: PathBuf,
+    folder: Arc<PathBuf>,
     cache: HashMap<Vec<Mime>, PathBuf>,
 }
 
@@ -19,12 +19,14 @@ impl Icons {
     pub fn new(theme: String) -> Self {
         let db = SharedMimeInfo::new();
         let size = 64;
-        let folder = lookup("folder")
-            .with_cache()
-            .with_theme(&theme)
-            .with_size(size)
-            .find()
-            .expect("Failed to find folder icon in the specified theme.");
+        let folder = Arc::new(
+            lookup("folder")
+                .with_cache()
+                .with_theme(&theme)
+                .with_size(size)
+                .find()
+                .expect("Failed to find folder icon in the specified theme."),
+        );
 
         Self {
             db,
@@ -40,7 +42,7 @@ impl Icons {
     }
 
     /// Get the default folder icon
-    pub fn get_folder(&self) -> PathBuf {
+    pub fn get_folder(&self) -> Arc<PathBuf> {
         self.folder.clone()
     }
 
