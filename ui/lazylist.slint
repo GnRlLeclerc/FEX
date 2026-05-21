@@ -1,4 +1,4 @@
-import { Item, ItemView } from "./items.slint";
+import { Item, Items, ItemView } from "./items.slint";
 import { Range, Utils } from "./utils.slint";
 import { ScrollView } from "std-widgets.slint";
 import { Config } from "config.slint";
@@ -6,13 +6,12 @@ import { Callbacks } from "./callbacks.slint";
 
 
 export component LazyList {
-    in property <[Item]> items;
-    in property <int> remaining: 0; // remaining entries to be padded with placeholders for accurate scrollbar size
+    in property <Items> items;
     property <int> cursor: -1;
 
     public function enter() {
         if cursor != -1 {
-            let item = items[cursor - offset];
+            let item = items.items[cursor - offset];
             Callbacks.open(item.key);
         }
     }
@@ -39,7 +38,7 @@ export component LazyList {
     public function down(select: bool) {
         if cursor == -1 {
             set-cursor();
-        } else if cursor < offset + items.length + remaining - 1 {
+        } else if cursor < items.offset + items.items.length + items.remaining - 1 {
             cursor += 1;
             let delta = -cursor * Config.item-total-height - scroll.viewport-y + scroll.visible-height - Config.item-total-height;
             if delta < 0 {
@@ -136,17 +135,17 @@ export component LazyList {
 
             // Virtual padding for elements scrolled out of view
             Rectangle {
-                height: list-padding-top;
+                height: items.offset * Config.item-total-height;
             }
 
-            for item[index] in items: ItemView {
+            for item[index] in items.items: ItemView {
                 item: item;
                 has-cursor: index + offset == cursor;
             }
 
             // Virtual padding for remaining elements not yet scrolled into view
             Rectangle {
-                height: remaining * Config.item-total-height;
+                height: items.remaining * Config.item-total-height;
             }
         }
 

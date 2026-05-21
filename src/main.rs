@@ -17,7 +17,11 @@ mod ui;
 
 fn main() {
     let explorer = ui::Explorer::new().expect("Failed to create explorer");
-    explorer.set_items(ModelRc::from(Rc::new(VecModel::default()))); // Initialize with an empty vecmodel
+    explorer.set_items(ui::Items {
+        items: ModelRc::from(Rc::new(VecModel::default())),
+        remaining: 0,
+        offset: 0,
+    }); // Initialize with an empty vecmodel
     explorer.set_cwd(ModelRc::from(Rc::new(VecModel::default()))); // Initialize with an empty vecmodel
 
     let weak = explorer.as_weak();

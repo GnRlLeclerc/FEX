@@ -2,13 +2,21 @@ import { Config } from "config.slint";
 import { Callbacks } from "./callbacks.slint";
 import { ItemKey } from "./utils.slint";
 
-
 export struct Item {
     key: ItemKey,
     name: string,
     selected: bool,
     icon: image,
 }
+
+// Item slice with metadata for granular display changes
+// without jittering (items & offset are not being updated independently)
+export struct Items {
+    items: [Item],
+    remaining: int,
+    offset: int,
+}
+
 
 export component ItemView inherits Rectangle {
     in property <Item> item;

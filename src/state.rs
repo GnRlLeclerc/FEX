@@ -85,6 +85,7 @@ impl State {
         }
 
         let remaining = self.items.len().saturating_sub(self.offset + self.limit);
+        let offset = self.offset;
         let cwd = self
             .cwd
             .components()
@@ -93,13 +94,20 @@ impl State {
 
         // 2. Send the cloned slice to the frontend
         let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
-            explorer.set_remaining(remaining as i32);
-            downcast_vec(&explorer.get_items()).set_vec(
+            let model = explorer.get_items().items;
+            downcast_vec(&model).set_vec(
                 new_items
                     .into_iter()
                     .map(|item| item.into())
                     .collect::<Vec<_>>(),
             );
+            let items = ui::Items {
+                items: model,
+                remaining: remaining as i32,
+                offset: offset as i32,
+            };
+
+            explorer.set_items(items);
 
             downcast_vec(&explorer.get_cwd()).set_vec(cwd);
         });
@@ -127,7 +135,7 @@ impl State {
                     self.items.select(key.clone().into());
                     let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
                         update_items(
-                            &explorer.get_items(),
+                            &explorer.get_items().items,
                             |item| {
                                 (item.key == key && !item.selected)
                                     || (item.key != key && item.selected)
@@ -139,7 +147,7 @@ impl State {
                     self.items.select(key.clone().into());
                     let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
                         update_items(
-                            &explorer.get_items(),
+                            &explorer.get_items().items,
                             |item| item.key == key,
                             |item| item.selected = true,
                         );
@@ -159,7 +167,7 @@ impl State {
                 self.explorer
                     .upgrade_in_event_loop(move |explorer| {
                         update_items(
-                            &explorer.get_items(),
+                            &explorer.get_items().items,
                             |item| item.key == key,
                             move |item| item.icon = Image::from_rgba8(buffer.clone()),
                         );
@@ -178,14 +186,18 @@ impl State {
             Message::SelectAll => {
                 self.items.select_all();
                 let _ = self.explorer.upgrade_in_event_loop(|explorer| {
-                    update_items(&explorer.get_items(), |_| true, |item| item.selected = true);
+                    update_items(
+                        &explorer.get_items().items,
+                        |_| true,
+                        |item| item.selected = true,
+                    );
                 });
             }
             Message::UnselectAll => {
                 self.items.unselect_all();
                 let _ = self.explorer.upgrade_in_event_loop(|explorer| {
                     update_items(
-                        &explorer.get_items(),
+                        &explorer.get_items().items,
                         |_| true,
                         |item| item.selected = false,
                     );
@@ -197,7 +209,7 @@ impl State {
 
                 let _ = self.explorer.upgrade_in_event_loop(move |explorer| {
                     update_items(
-                        &explorer.get_items(),
+                        &explorer.get_items().items,
                         |item| keys.contains(&item.key),
                         |item| item.selected = selected,
                     );

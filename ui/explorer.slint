@@ -1,5 +1,5 @@
 import { Button, ScrollView, LineEdit } from "std-widgets.slint";
-import { Item } from "./items.slint";
+import { Item, Items } from "./items.slint";
 import { ItemKey } from "./utils.slint";
 import { LazyList } from "./lazylist.slint";
 import { Search, SearchState } from "./search.slint";
@@ -13,9 +13,8 @@ export { Config } from "./config.slint";
 export component Explorer inherits Window {
     forward-focus: scope;
 
-    in property <[Item]> items;
+    in property <Items> items;
     in property <[string]> cwd;
-    in property <int> remaining: 0;
     property <SearchState> state: browsing;
 
     // Properly reset focus to the root scope on search exit
@@ -94,6 +93,7 @@ export component Explorer inherits Window {
                 lazy.enter();
             }
         }
+
         VerticalLayout {
             if state == SearchState.browsing: ScrollView {
                 height: 50px;
@@ -120,7 +120,6 @@ export component Explorer inherits Window {
 
             lazy := LazyList {
                 items: items;
-                remaining: remaining;
             }
         }
     }
