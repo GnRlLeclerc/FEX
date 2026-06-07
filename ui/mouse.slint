@@ -1,0 +1,83 @@
+// Mouse utils & globals
+// Centralized handling in order to seamlessly integrate list scrolling and item dragging.
+
+import { Utils } from "utils.slint";
+import { Callbacks } from "callbacks.slint";
+import { Config } from "config.slint";
+
+export global Mouse {
+    out property <{ x: length, y: length}> anchor;
+    out property <{ x: length, y: length}> mouse;
+    out property <bool> selecting: false;
+    out property <bool> dragging: false;
+
+    public pure function select-x() -> length {
+        min(anchor.x, mouse.x)
+    }
+
+    public pure function select-y() -> length {
+        min(anchor.y, mouse.y)
+    }
+
+    public pure function select-width() -> length {
+        abs(anchor.x - mouse.x)
+    }
+
+    public pure function select-height() -> length {
+        abs(anchor.y - mouse.y)
+    }
+
+    // Handle a pointer event for selection and dragging.
+    // Pass in the toucharea mouse x & y position.
+    public function pointer-event(event: PointerEvent, x: length, y: length) {
+        if event.kind == PointerEventKind.down {
+            selecting = true;
+            anchor = { x: x, y: y };
+            mouse = anchor;
+            Callbacks.select-all(false); // clear selection
+        } else if event.kind == PointerEventKind.up {
+            // TODO: if instead we are dragging ? Need an additional argument. Probably a list of icons to display ?
+            selecting = false;
+        } else if event.kind == PointerEventKind.move && selecting {
+            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, y);
+            Callbacks.select-update(updates);
+            mouse = { x: x, y: y };
+        }
+    }
+
+    // Tick the viewport scroll when selecting or dragging near the top / bottom of the viewport.
+    // Returns the new viewport-y position.
+    public function tick-scroll(y: length, viewport-y: length, visible-height: length, viewport-height: length) -> length {
+        let range = Config.scroll-range;
+        let top = y - viewport-y + range;
+        let bottom = y + visible-height - viewport-y - range;
+
+        // Check proximity to bottom
+        if mouse.y > bottom {
+            let speed = min((mouse.y - bottom) / range, 1);
+            let delta = speed * speed * Config.scroll-max-delta;
+            let clamped = min(delta, viewport-height - visible-height + viewport-y);
+
+            // Update selection
+            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y + clamped);
+            Callbacks.select-update(updates);
+
+            mouse.y += clamped;
+            return viewport-y - clamped;
+
+        // Check proximity to top
+        } else if mouse.y < top {
+            let speed = min((top - mouse.y) / range, 1);
+            let delta = speed * speed * Config.scroll-max-delta;
+            let clamped = min(delta, -viewport-y);
+
+            // Update selection
+            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y - clamped);
+            Callbacks.select-update(updates);
+
+            mouse.y -= clamped;
+            return viewport-y + clamped;
+        }
+        return viewport-y;
+    }
+}

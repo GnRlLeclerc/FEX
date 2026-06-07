@@ -3,6 +3,7 @@ import { Range, Utils } from "./utils.slint";
 import { ScrollView } from "std-widgets.slint";
 import { Config } from "config.slint";
 import { Callbacks } from "./callbacks.slint";
+import { Mouse } from "mouse.slint";
 
 
 export component LazyList {
@@ -49,9 +50,6 @@ export component LazyList {
 
     property <int> offset: Math.floor(-scroll.viewport-y / Config.item-total-height); // entries hidden by the current scroll offset
     property <int> limit: Math.ceil(scroll.visible-height / Config.item-total-height) + 1; // amount of visible entries
-    property <{ x: length, y: length}> anchor;
-    property <{ x: length, y: length}> mouse;
-    property <bool> selecting: false;
     property <length> list-padding-top;
 
     // Refresh both entries and top padding rectangle at the same time
@@ -72,37 +70,9 @@ export component LazyList {
     // Scroll on select when the cursor is near the top / bottom
     timer := Timer {
         interval: Config.scroll-tick;
-        running: selecting;
+        running: Mouse.selecting || Mouse.dragging;
         triggered() => {
-            let range = Config.scroll-range;
-            let top = scroll.y - scroll.viewport-y + range;
-            let bottom = scroll.y + scroll.visible-height - scroll.viewport-y - range;
-
-            // Check proximity to bottom
-            if mouse.y > bottom {
-                let speed = min((mouse.y - bottom) / range, 1);
-                let delta = speed * speed * Config.scroll-max-delta;
-                let clamped = min(delta, scroll.viewport-height - scroll.visible-height + scroll.viewport-y);
-
-                // Update selection
-                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y + clamped);
-                Callbacks.select-update(updates);
-
-                mouse.y += clamped;
-                scroll.viewport-y -= clamped;
-            // Check proximity to top
-            } else if mouse.y < top {
-                let speed = min((top - mouse.y) / range, 1);
-                let delta = speed * speed * Config.scroll-max-delta;
-                let clamped = min(delta, -scroll.viewport-y);
-
-                // Update selection
-                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y - clamped);
-                Callbacks.select-update(updates);
-
-                mouse.y -= clamped;
-                scroll.viewport-y += clamped;
-            }
+            scroll.viewport-y = Mouse.tick-scroll(scroll.y, scroll.viewport-y, scroll.visible-height, scroll.viewport-height);
         }
     }
 
@@ -114,20 +84,7 @@ export component LazyList {
         }
 
         ta := TouchArea {
-            pointer-event(event) => {
-                if event.kind == PointerEventKind.down {
-                    selecting = true;
-                    anchor = { x: ta.mouse-x, y: ta.mouse-y };
-                    mouse = anchor;
-                    Callbacks.select-all(false); // clear selection
-                } else if event.kind == PointerEventKind.up {
-                    selecting = false;
-                } else if event.kind == PointerEventKind.move && selecting {
-                    let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, ta.mouse-y);
-                    Callbacks.select-update(updates);
-                    mouse = { x: ta.mouse-x, y: ta.mouse-y };
-                }
-            }
+            pointer-event(event) => Mouse.pointer-event(event, ta.mouse-x, ta.mouse-y);
         }
 
         VerticalLayout {
@@ -151,17 +108,17 @@ export component LazyList {
 
         // Selection rectangle
         Rectangle {
-            visible: selecting;
+            visible: Mouse.selecting;
 
             border-color: green;
             border-width: 2px;
             border-radius: 5px;
 
-            x: Math.min(anchor.x, mouse.x);
-            y: Math.min(anchor.y, mouse.y);
+            x: Mouse.select-x();
+            y: Mouse.select-y();
 
-            width: Math.abs(mouse.x - anchor.x);
-            height: Math.abs(mouse.y - anchor.y);
+            width: Mouse.select-width();
+            height: Mouse.select-height();
         }
     }
 }
