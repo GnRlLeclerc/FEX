@@ -1,6 +1,7 @@
 import { Config } from "config.slint";
 import { Callbacks } from "./callbacks.slint";
 import { ItemKey } from "./utils.slint";
+import { Mouse } from "mouse.slint";
 
 export struct Item {
     key: ItemKey,
@@ -19,6 +20,7 @@ export struct Items {
 
 
 export component ItemView inherits Rectangle {
+    in property <length> list-y;
     in property <Item> item;
     in property <bool> has-cursor: false;
 
@@ -38,6 +40,11 @@ export component ItemView inherits Rectangle {
         pointer-event(event) => {
             ctrl = event.modifiers.control;
             shift = event.modifiers.shift;
+
+            if event.kind == PointerEventKind.down {
+                Mouse.dragged = item.icon;
+            }
+            Mouse.pointer-event(event, ta.mouse-x, ta.mouse-y + list-y, true);
         }
 
         clicked => Callbacks.select(item.key, !ctrl);

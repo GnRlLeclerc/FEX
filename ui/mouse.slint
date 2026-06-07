@@ -11,6 +11,9 @@ export global Mouse {
     out property <bool> selecting: false;
     out property <bool> dragging: false;
 
+    property <duration> click-time;
+    in-out property <image> dragged; // TODO: maybe set more than 1 if more than 1 are selected
+
     public pure function select-x() -> length {
         min(anchor.x, mouse.x)
     }
@@ -29,19 +32,26 @@ export global Mouse {
 
     // Handle a pointer event for selection and dragging.
     // Pass in the toucharea mouse x & y position.
-    public function pointer-event(event: PointerEvent, x: length, y: length) {
+    public function pointer-event(event: PointerEvent, x: length, y: length, item: bool) {
         if event.kind == PointerEventKind.down {
-            selecting = true;
             anchor = { x: x, y: y };
             mouse = anchor;
-            Callbacks.select-all(false); // clear selection
+            if item {
+                dragging = true;
+            } else {
+                selecting = true;
+                Callbacks.select-all(false); // clear selection
+            }
         } else if event.kind == PointerEventKind.up {
-            // TODO: if instead we are dragging ? Need an additional argument. Probably a list of icons to display ?
             selecting = false;
-        } else if event.kind == PointerEventKind.move && selecting {
-            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, y);
-            Callbacks.select-update(updates);
+            dragging = false;
+        } else if event.kind == PointerEventKind.move {
             mouse = { x: x, y: y };
+
+            if selecting {
+                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, y);
+                Callbacks.select-update(updates);
+            }
         }
     }
 
@@ -59,9 +69,10 @@ export global Mouse {
             let clamped = min(delta, viewport-height - visible-height + viewport-y);
 
             // Update selection
-            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y + clamped);
-            Callbacks.select-update(updates);
-
+            if selecting {
+                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y + clamped);
+                Callbacks.select-update(updates);
+            }
             mouse.y += clamped;
             return viewport-y - clamped;
 
@@ -72,9 +83,10 @@ export global Mouse {
             let clamped = min(delta, -viewport-y);
 
             // Update selection
-            let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y - clamped);
-            Callbacks.select-update(updates);
-
+            if selecting {
+                let updates = Utils.selection-updates-from-pos(anchor.y, mouse.y, mouse.y - clamped);
+                Callbacks.select-update(updates);
+            }
             mouse.y -= clamped;
             return viewport-y + clamped;
         }

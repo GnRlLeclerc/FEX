@@ -84,7 +84,7 @@ export component LazyList {
         }
 
         ta := TouchArea {
-            pointer-event(event) => Mouse.pointer-event(event, ta.mouse-x, ta.mouse-y);
+            pointer-event(event) => Mouse.pointer-event(event, ta.mouse-x, ta.mouse-y, false);
         }
 
         VerticalLayout {
@@ -96,6 +96,7 @@ export component LazyList {
             }
 
             for item[index] in items.items: ItemView {
+                list-y: (offset + index) * Config.item-total-height + Config.spacing;
                 item: item;
                 has-cursor: index + offset == cursor;
             }
@@ -104,6 +105,17 @@ export component LazyList {
             Rectangle {
                 height: items.remaining * Config.item-total-height;
             }
+        }
+
+        // Item dragging indicator
+        Image {
+            visible: Mouse.dragging;
+            x: Mouse.mouse.x;
+            y: Mouse.mouse.y;
+
+            source: Mouse.dragged;
+            height: 50px;
+            width: 50px;
         }
 
         // Selection rectangle
